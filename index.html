@@ -564,54 +564,80 @@ function syncGameState() {
 }
 
 function applyGameState(remoteGame) {
+    // 1. 同步核心数据
     game.turn = remoteGame.turn;
     game.players = remoteGame.players;
     game.totalPlayers = remoteGame.totalPlayers;
     game.mode = remoteGame.mode;
     game.target = remoteGame.target;
+    // 同步路径数据，防止从机看不见移动路线
+    game.validDestinations = remoteGame.validDestinations || [];
+    game.pathMap = remoteGame.pathMap || {};
+
+    // 2. 智能屏幕跳转逻辑
     
-    // 如果当前界面还是初始界面，强制跳转到游戏或选人界面
-    if(remoteGame.players.length > 0 && document.getElementById('screen-roles').classList.contains('hidden') && document.getElementById('screen-game').classList.contains('hidden')) {
-         if(remoteGame.players[0].sid) startGame(); 
-         else { showScreen('screen-roles'); renderRoleSelection(remoteGame.players.length-1); }
+    // 阶段一：刚开始，主机选了人数（例如2人局），正在选模式
+    if (game.totalPlayers > 0 && game.players.length === 0) {
+        if (document.getElementById('screen-mode').classList.contains('hidden')) {
+            showScreen('screen-mode');
+        }
+        // 同步模式选择的高亮状态（上班族/淘金梦）
+        const cards = document.querySelectorAll('#screen-mode .select-card');
+        cards.forEach(c => c.classList.remove('selected'));
+        if (game.mode === 'work') cards[0].classList.add('selected');
+        else if (game.mode === 'money') cards[1].classList.add('selected');
     }
     
-    if(!document.getElementById('screen-game').classList.contains('hidden')) {
+    // 阶段二：正在选角色
+    else if (game.players.length > 0 && game.players.length < game.totalPlayers) {
+        if (document.getElementById('screen-roles').classList.contains('hidden')) {
+            showScreen('screen-roles');
+        }
+        // 重新渲染选人界面，这样手机B也能看到哪些角色被选了
+        renderRoleSelection(game.players.length); 
+    }
+    
+    // 阶段三：选人完毕，进入转盘 或者 已经开始游戏
+    else if (game.totalPlayers > 0 && game.players.length === game.totalPlayers) {
+        const p0 = game.players[0];
+        
+        // 如果玩家1还没有站点ID，说明还在转盘阶段
+        if (!p0.sid) {
+             if (document.getElementById('screen-wheel').classList.contains('hidden')) {
+                 // 找到当前正在转盘的玩家下标
+                 const currentPid = game.players.findIndex(p => p.sid === null);
+                 if(currentPid !== -1) initWheel(currentPid);
+             }
+        } 
+        // 否则说明游戏已经正式开始了（地图界面）
+        else {
+            if (document.getElementById('screen-game').classList.contains('hidden')) {
+                startGame();
+            }
+        }
+    }
+
+    // 3. 游戏内实时画面同步
+    if (!document.getElementById('screen-game').classList.contains('hidden')) {
         renderMap();
-        initPlayerCards(); // 重新渲染玩家卡片防止找不到ID
-        renderPlayers();
-        centerCamera(game.players[game.turn].sid);
+        initPlayerCards(); // 刷新底部玩家卡片
+        renderPlayers();   // 刷新地图上的棋子位置
+        
+        // 只有当轮到手机B操作时，才把镜头移过去，否则跟着主机看
+        // 这里简单处理：每次同步都跟随当前行动的玩家镜头
+        if (game.players[game.turn] && game.players[game.turn].sid) {
+            centerCamera(game.players[game.turn].sid);
+        }
+        
+        // 同步移动路线高亮（如果主机正在掷骰子选路）
+        if (game.validDestinations.length > 0) {
+            highlightDestinations(true);
+        } else {
+            highlightDestinations(false);
+        }
     }
-    updateUI();
-}
-
-// 劫持 updateUI 以触发同步
-const originalUpdateUI = updateUI;
-updateUI = function() {
-    originalUpdateUI();
-    syncGameState();
-};
-
-// 劫持 showModal 以同步弹窗
-const originalShowModal = showModal;
-showModal = function(t, c, isFromNet = false) {
-    document.getElementById('modal-title').innerHTML = t;
-    document.getElementById('modal-content').innerHTML = c;
-    document.getElementById('modal-overlay').style.display = 'block';
-    document.getElementById('modal').style.display = 'block';
     
-    if (!isFromNet && conn && conn.open) {
-        conn.send({ type: 'SHOW_MODAL', title: t, content: c });
-    }
-};
-
-// 劫持 closeModal
-const originalCloseModal = closeModal;
-closeModal = function() {
-    document.getElementById('modal-overlay').style.display = 'none';
-    document.getElementById('modal').style.display = 'none';
-    // 只有主动点击的人才触发 nextTurn，然后通过 updateUI 同步给对方
-    nextTurn(); 
+    updateUI();
 }
 
 // UI 辅助
