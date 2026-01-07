@@ -667,5 +667,109 @@ function showConnectedUI(msg) {
 // 启动联机模块
 setTimeout(initNetwork, 1000);
 </script>
+<script>
+// ============================================================
+// 🚨 终极补丁：强制同步逻辑 (粘贴到 index.html 最末尾)
+// ============================================================
+
+// 1. 劫持“选择人数”按钮
+const originalInitStep1 = initGameStep1;
+initGameStep1 = function(num) {
+    console.log("主机点击了人数选择：" + num);
+    originalInitStep1(num); // 执行原逻辑
+    syncGameState();        // 📡 立即发送同步信号！
+};
+
+// 2. 劫持“选择模式”按钮
+const originalSelectMode = selectMode;
+selectMode = function(m, el) {
+    console.log("主机点击了模式：" + m);
+    originalSelectMode(m, el);
+    syncGameState();        // 📡 立即发送同步信号！
+};
+
+// 3. 劫持“进入角色选择”按钮
+const originalToRoleSelect = toRoleSelect;
+toRoleSelect = function() {
+    console.log("主机进入角色选择");
+    originalToRoleSelect();
+    syncGameState();        // 📡 立即发送同步信号！
+};
+
+// 4. 劫持“确认角色”按钮
+const originalConfirmRole = confirmRole;
+confirmRole = function(pid, role) {
+    console.log("主机确认了角色");
+    originalConfirmRole(pid, role);
+    syncGameState();        // 📡 立即发送同步信号！
+};
+
+// 5. 劫持“转盘”按钮
+const originalSpinWheel = spinWheel;
+spinWheel = function() {
+    // 转盘比较特殊，我们只同步“开始转”这个动作是不够的
+    // 最好是主机转出结果后，把结果同步给对方
+    document.getElementById('spin-btn').disabled = true; 
+    
+    // 生成随机结果（由主机决定）
+    const rot = 1800 + Math.random() * 360; 
+    const w = document.getElementById('wheel');
+    w.style.transform = `rotate(-${rot}deg)`;
+    
+    // 计算结果ID
+    const idx = Math.floor((rot % 360) / (360 / START_SPOTS.length));
+    const res = START_SPOTS[idx];
+    
+    // 关键：告诉对方“我转到了这个角度，结果是这个”
+    if (conn && conn.open) {
+        conn.send({
+            type: 'SYNC_WHEEL',
+            rotation: rot,
+            resultId: res.id,
+            resultName: res.n
+        });
+    }
+
+    // 本地执行后续动画逻辑
+    setTimeout(() => {
+        const pid = game.players.findIndex(p => p.sid === null);
+        game.players[pid].sid = res.id;
+        document.getElementById('wheel-result').innerText = `出发: ${res.n}`;
+        
+        // 动画结束后，再同步一次全状态，确保数据一致
+        setTimeout(() => {
+            syncGameState();
+            if (pid < game.totalPlayers - 1) initWheel(pid + 1);
+            else startGame();
+        }, 1500);
+    }, 3000);
+};
+
+// 6. 接收端增加对“转盘同步”的处理
+// 我们需要扩展 handleConnection 里的监听
+if (conn) {
+    // 如果连接已经存在，重新绑定一下监听（这步比较hack，但有效）
+    const oldDataHandler = conn._events['data']; // 获取旧的监听器
+    conn.off('data'); // 移除旧的
+    
+    conn.on('data', (data) => {
+        console.log("收到数据类型:", data.type);
+        
+        if (data.type === 'SYNC_STATE') {
+            applyGameState(data.payload);
+        } 
+        else if (data.type === 'SHOW_MODAL') {
+            showModal(data.title, data.content, true);
+        }
+        else if (data.type === 'SYNC_WHEEL') {
+            // 对方转了转盘，我也跟着转
+            const w = document.getElementById('wheel');
+            w.style.transform = `rotate(-${data.rotation}deg)`;
+            document.getElementById('spin-btn').disabled = true;
+            document.getElementById('wheel-result').innerText = `出发: ${data.resultName}`;
+        }
+    });
+}
+</script>
 </body>
 </html>
