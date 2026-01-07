@@ -435,6 +435,13 @@ function handleEvent(p, st) {
     }
     else if (st.ev === 'goto_jail' && p.role.id !== 'student') { p.sid = 'fangcun'; p.isJailed = true; renderPlayers(); centerCamera(p.sid); refreshUI = true; }
     else if (st.ev === 'speed_x2') { p.speedBuff = true; refreshUI = true; }
+        // 在 handleEvent 函数中补充
+    else if (st.ev === 'fly') {
+        const keys = Object.keys(STATIONS);
+        p.sid = keys[Math.floor(Math.random() * keys.length)];
+        msg += `<br>✈️ 瞬间移动到了：${STATIONS[p.sid].n}`;
+        renderPlayers(); centerCamera(p.sid);
+    }
 
     if (refreshUI) updateUI();
     if (p.money < 0) { p.isBankrupt = true; updateUI(); msg += "<br>破产！"; }
