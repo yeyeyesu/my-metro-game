@@ -202,7 +202,9 @@
 
 <script src="data.js"></script>
 <script>
-// 音效合成器
+// ==========================================
+// 1. 基础工具与音效
+// ==========================================
 const SFX = {
     ctx: null,
     init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
@@ -245,14 +247,28 @@ let game = {
 
 window.onload = () => buildGraph();
 
-function initGameStep1(num) { game.totalPlayers = num; showScreen('screen-mode'); updateUI(); } // Hack: trigger sync
+// ==========================================
+// 2. 游戏核心逻辑 (已修改为主动触发同步)
+// ==========================================
+
+function initGameStep1(num) { 
+    game.totalPlayers = num; 
+    showScreen('screen-mode'); 
+    syncGameState(); // 🚨 关键修复：立即同步
+}
+
 function selectMode(m, el) {
     game.mode = m; game.target = (m==='work') ? 'zhujiang' : null;
     document.querySelectorAll('#screen-mode .select-card').forEach(c => c.classList.remove('selected'));
     el.classList.add('selected');
-    updateUI(); // Hack: trigger sync
+    syncGameState(); // 🚨 关键修复：立即同步
 }
-function toRoleSelect() { renderRoleSelection(0); showScreen('screen-roles'); updateUI(); }
+
+function toRoleSelect() { 
+    renderRoleSelection(0); 
+    showScreen('screen-roles'); 
+    syncGameState(); // 🚨 关键修复：立即同步
+}
 
 function renderRoleSelection(pid) {
     const container = document.getElementById('role-container'); container.innerHTML = '';
@@ -270,11 +286,15 @@ function confirmRole(pid, role) {
     game.players.push({ id: pid, name: `玩家${pid+1}`, role: role, color: role.c, sid: null, skip: 0, speedBuff: false, money: 2000, buffs: [], isJailed: false, jailTurns: 0, isBankrupt: false });
     if (pid < game.totalPlayers - 1) renderRoleSelection(pid + 1);
     else initWheel(0);
-    updateUI(); // Hack: trigger sync
+    syncGameState(); // 🚨 关键修复：立即同步
 }
 
 function initWheel(pid) {
-    showScreen('screen-wheel'); const p = game.players[pid];
+    showScreen('screen-wheel'); 
+    // 安全检查，防止数组越界
+    if (!game.players[pid]) return;
+    
+    const p = game.players[pid];
     document.getElementById('wheel-player').innerText = p.name; document.getElementById('wheel-player').style.color = p.color;
     document.getElementById('spin-btn').disabled = false; document.getElementById('wheel-result').innerText = '';
     const w = document.getElementById('wheel'); w.innerHTML = '';
@@ -288,15 +308,34 @@ function initWheel(pid) {
 }
 
 function spinWheel() {
-    document.getElementById('spin-btn').disabled = true; const w = document.getElementById('wheel');
-    const rot = 1800 + Math.random() * 360; w.style.transform = `rotate(-${rot}deg)`;
+    document.getElementById('spin-btn').disabled = true; 
+    const w = document.getElementById('wheel');
+    const rot = 1800 + Math.random() * 360; 
+    
+    // 告诉对方我在转，并告知结果
+    const idx = Math.floor((rot % 360) / (360 / START_SPOTS.length));
+    const res = START_SPOTS[idx];
+    
+    // 发送转盘动画指令
+    if(conn && conn.open) {
+        conn.send({
+            type: 'SYNC_WHEEL',
+            rotation: rot,
+            resultName: res.n
+        });
+    }
+
+    w.style.transform = `rotate(-${rot}deg)`;
+    
     setTimeout(() => {
-        const idx = Math.floor((rot % 360) / (360 / START_SPOTS.length));
-        const res = START_SPOTS[idx]; const pid = game.players.findIndex(p => p.sid === null);
-        game.players[pid].sid = res.id; document.getElementById('wheel-result').innerText = `出发: ${res.n}`;
+        const pid = game.players.findIndex(p => p.sid === null);
+        game.players[pid].sid = res.id; 
+        document.getElementById('wheel-result').innerText = `出发: ${res.n}`;
+        
         setTimeout(() => {
             if (pid < game.totalPlayers - 1) initWheel(pid + 1);
             else startGame();
+            syncGameState(); // 动画结束，同步状态
         }, 1500);
     }, 3000);
 }
@@ -304,6 +343,7 @@ function spinWheel() {
 function startGame() {
     renderMap(); renderPlayers(); initPlayerCards(); showScreen('screen-game'); updateUI();
     centerCamera(game.players[0].sid);
+    syncGameState();
 }
 
 function centerCamera(sid) {
@@ -337,6 +377,7 @@ function rollDice() {
             clearInterval(timer); let val = parseInt(document.getElementById('dice-box').innerText);
             let steps = p.speedBuff ? val * 2 : val; p.speedBuff = false;
             calculateDestinations(p, steps);
+            syncGameState(); // 同步骰子结果
         }
     }, 50);
 }
@@ -363,6 +404,7 @@ function calculateDestinations(p, steps) {
         setTimeout(() => movePlayer(target), 800);
     } else {
         highlightDestinations(true); document.getElementById('ui-tip').innerText = `🖱️ 请手动选择目的地`;
+        syncGameState(); // 同步高亮选择
     }
 }
 
@@ -378,6 +420,11 @@ function highlightDestinations(active) {
 
 async function movePlayer(targetSid) {
     highlightDestinations(false); const p = game.players[game.turn]; const path = game.pathMap[targetSid] || [targetSid];
+    // 同步移动动作
+    if(conn && conn.open) {
+        conn.send({ type: 'PLAYER_MOVE', targetSid: targetSid });
+    }
+
     for (let nextSid of path) { p.sid = nextSid; renderPlayers(); SFX.play('tick'); centerCamera(nextSid); updateUI(); await new Promise(r => setTimeout(r, 300)); }
     if (game.mode === 'work' && p.sid === game.target) { showModal('胜利', '到达珠江新城！'); setTimeout(() => endGame(p), 2000); }
     else { setTimeout(() => handleEvent(p, STATIONS[p.sid]), 300); }
@@ -435,13 +482,6 @@ function handleEvent(p, st) {
     }
     else if (st.ev === 'goto_jail' && p.role.id !== 'student') { p.sid = 'fangcun'; p.isJailed = true; renderPlayers(); centerCamera(p.sid); refreshUI = true; }
     else if (st.ev === 'speed_x2') { p.speedBuff = true; refreshUI = true; }
-        // 在 handleEvent 函数中补充
-    else if (st.ev === 'fly') {
-        const keys = Object.keys(STATIONS);
-        p.sid = keys[Math.floor(Math.random() * keys.length)];
-        msg += `<br>✈️ 瞬间移动到了：${STATIONS[p.sid].n}`;
-        renderPlayers(); centerCamera(p.sid);
-    }
 
     if (refreshUI) updateUI();
     if (p.money < 0) { p.isBankrupt = true; updateUI(); msg += "<br>破产！"; }
@@ -452,6 +492,7 @@ function nextTurn() {
     do { game.turn = (game.turn + 1) % game.totalPlayers; } while (game.players[game.turn].isBankrupt);
     updateUI(); document.getElementById('roll-btn').disabled = false; document.getElementById('dice-box').innerText = '?';
     centerCamera(game.players[game.turn].sid);
+    syncGameState(); // 同步回合变更
 }
 
 function renderMap() {
@@ -487,7 +528,7 @@ function renderPlayers() {
 function updateUI() {
     game.players.forEach((p, idx) => {
         const card = document.getElementById(`p-card-${idx}`);
-        if(card) { // Safety check
+        if(card) {
             document.getElementById(`p-money-${idx}`).innerText = `¥ ${p.money}`;
             document.getElementById(`p-station-${idx}`).innerText = STATIONS[p.sid]?.n || '';
             document.getElementById(`p-status-${idx}`).innerText = p.isBankrupt ? '☠️ 破产' : (p.skip > 0 ? '⏸ 暂停' : '');
@@ -497,22 +538,9 @@ function updateUI() {
 }
 
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
-function showModal(t, c) { document.getElementById('modal-title').innerHTML = t; document.getElementById('modal-content').innerHTML = c; document.getElementById('modal-overlay').style.display = 'block'; document.getElementById('modal').style.display = 'block'; }
-function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; document.getElementById('modal').style.display = 'none'; nextTurn(); }
-
-function endGame(winner) { showScreen('screen-end'); document.getElementById('winner-name').innerText = winner.name; document.getElementById('winner-role').innerText = winner.role.n; }
-
-function initDevTool() {
-    document.getElementById('game-container').addEventListener('click', e => {
-        if(e.target.tagName !== 'svg') return;
-        const svg = document.getElementById('metro-svg'), pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
-        const p = pt.matrixTransform(svg.getScreenCTM().inverse());
-        console.log(`x:${Math.round(p.x)}, y:${Math.round(p.y)}`);
-    });
-}
 
 // ==========================================
-// 联机核心代码逻辑 (PeerJS)
+// 3. 联机核心代码逻辑 (PeerJS) - 修复版
 // ==========================================
 let peer = null;
 let conn = null;
@@ -528,8 +556,8 @@ function initNetwork() {
     peer.on('connection', (c) => {
         handleConnection(c);
         showConnectedUI('对方已加入，你是房主');
-        // 如果游戏已经开始了，立刻同步状态给新来的人
-        if(game.players.length > 0) syncGameState();
+        // 🚨 关键修复：无条件立即同步，无论当前是哪个界面
+        syncGameState();
     });
 
     peer.on('error', (err) => { alert('联机错误: ' + err.type); });
@@ -550,9 +578,19 @@ function handleConnection(connection) {
             applyGameState(data.payload);
         } else if (data.type === 'SHOW_MODAL') {
             showModal(data.title, data.content, true);
+        } else if (data.type === 'SYNC_WHEEL') {
+            // 转盘动画同步
+            const w = document.getElementById('wheel');
+            w.style.transform = `rotate(-${data.rotation}deg)`;
+            document.getElementById('spin-btn').disabled = true;
+            document.getElementById('wheel-result').innerText = `出发: ${data.resultName}`;
         }
     });
-    conn.on('open', () => { if(game.players.length > 0) syncGameState(); });
+    // 🚨 关键修复：连接建立后，主机再次尝试同步
+    conn.on('open', () => { 
+        console.log("连接通道建立，尝试同步...");
+        syncGameState(); 
+    });
 }
 
 function syncGameState() {
@@ -560,84 +598,75 @@ function syncGameState() {
         // 简单深拷贝，防止循环引用
         const safeGame = JSON.parse(JSON.stringify(game));
         conn.send({ type: 'SYNC_STATE', payload: safeGame });
+        console.log("已发送状态同步");
     }
 }
 
 function applyGameState(remoteGame) {
-    // 1. 同步核心数据
+    // 1. 同步数据
     game.turn = remoteGame.turn;
     game.players = remoteGame.players;
     game.totalPlayers = remoteGame.totalPlayers;
     game.mode = remoteGame.mode;
     game.target = remoteGame.target;
-    // 同步路径数据，防止从机看不见移动路线
     game.validDestinations = remoteGame.validDestinations || [];
     game.pathMap = remoteGame.pathMap || {};
 
-    // 2. 智能屏幕跳转逻辑
-    
-    // 阶段一：刚开始，主机选了人数（例如2人局），正在选模式
-    if (game.totalPlayers > 0 && game.players.length === 0) {
-        if (document.getElementById('screen-mode').classList.contains('hidden')) {
-            showScreen('screen-mode');
-        }
-        // 同步模式选择的高亮状态（上班族/淘金梦）
-        const cards = document.querySelectorAll('#screen-mode .select-card');
-        cards.forEach(c => c.classList.remove('selected'));
-        if (game.mode === 'work') cards[0].classList.add('selected');
-        else if (game.mode === 'money') cards[1].classList.add('selected');
+    // 2. 界面跳转逻辑 (修复版)
+    // 如果总人数已定，但本地还没切到模式选择
+    if (game.totalPlayers > 0 && document.getElementById('screen-mode').classList.contains('hidden') && game.players.length === 0) {
+        showScreen('screen-mode');
     }
     
-    // 阶段二：正在选角色
-    else if (game.players.length > 0 && game.players.length < game.totalPlayers) {
-        if (document.getElementById('screen-roles').classList.contains('hidden')) {
-            showScreen('screen-roles');
-        }
-        // 重新渲染选人界面，这样手机B也能看到哪些角色被选了
-        renderRoleSelection(game.players.length); 
+    // 如果开始选人了
+    if (game.players.length > 0 && game.players.length < game.totalPlayers) {
+        if(document.getElementById('screen-roles').classList.contains('hidden')) showScreen('screen-roles');
+        renderRoleSelection(game.players.length);
     }
     
-    // 阶段三：选人完毕，进入转盘 或者 已经开始游戏
-    else if (game.totalPlayers > 0 && game.players.length === game.totalPlayers) {
+    // 如果选完了，进转盘或地图
+    if (game.players.length === game.totalPlayers && game.totalPlayers > 0) {
         const p0 = game.players[0];
-        
-        // 如果玩家1还没有站点ID，说明还在转盘阶段
         if (!p0.sid) {
-             if (document.getElementById('screen-wheel').classList.contains('hidden')) {
-                 // 找到当前正在转盘的玩家下标
-                 const currentPid = game.players.findIndex(p => p.sid === null);
-                 if(currentPid !== -1) initWheel(currentPid);
-             }
-        } 
-        // 否则说明游戏已经正式开始了（地图界面）
-        else {
-            if (document.getElementById('screen-game').classList.contains('hidden')) {
-                startGame();
-            }
+             const currentPid = game.players.findIndex(p => p.sid === null);
+             if(currentPid !== -1 && document.getElementById('screen-wheel').classList.contains('hidden')) initWheel(currentPid);
+        } else {
+             if(document.getElementById('screen-game').classList.contains('hidden')) startGame();
         }
     }
 
-    // 3. 游戏内实时画面同步
-    if (!document.getElementById('screen-game').classList.contains('hidden')) {
+    // 3. 游戏内更新
+    if(!document.getElementById('screen-game').classList.contains('hidden')) {
         renderMap();
-        initPlayerCards(); // 刷新底部玩家卡片
-        renderPlayers();   // 刷新地图上的棋子位置
+        initPlayerCards();
+        renderPlayers();
+        // 只有轮到对方操作时，我才看过去；或者如果我是观众，我就一直看
+        if (game.players[game.turn].sid) centerCamera(game.players[game.turn].sid);
         
-        // 只有当轮到手机B操作时，才把镜头移过去，否则跟着主机看
-        // 这里简单处理：每次同步都跟随当前行动的玩家镜头
-        if (game.players[game.turn] && game.players[game.turn].sid) {
-            centerCamera(game.players[game.turn].sid);
-        }
-        
-        // 同步移动路线高亮（如果主机正在掷骰子选路）
-        if (game.validDestinations.length > 0) {
-            highlightDestinations(true);
-        } else {
-            highlightDestinations(false);
-        }
+        if (game.validDestinations.length > 0) highlightDestinations(true);
+        else highlightDestinations(false);
     }
     
     updateUI();
+}
+
+// 劫持 showModal
+const originalShowModal = showModal;
+showModal = function(t, c, isFromNet = false) {
+    document.getElementById('modal-title').innerHTML = t;
+    document.getElementById('modal-content').innerHTML = c;
+    document.getElementById('modal-overlay').style.display = 'block';
+    document.getElementById('modal').style.display = 'block';
+    
+    if (!isFromNet && conn && conn.open) {
+        conn.send({ type: 'SHOW_MODAL', title: t, content: c });
+    }
+};
+
+function closeModal() {
+    document.getElementById('modal-overlay').style.display = 'none';
+    document.getElementById('modal').style.display = 'none';
+    nextTurn(); 
 }
 
 // UI 辅助
@@ -666,110 +695,6 @@ function showConnectedUI(msg) {
 
 // 启动联机模块
 setTimeout(initNetwork, 1000);
-</script>
-<script>
-// ============================================================
-// 🚨 终极补丁：强制同步逻辑 (粘贴到 index.html 最末尾)
-// ============================================================
-
-// 1. 劫持“选择人数”按钮
-const originalInitStep1 = initGameStep1;
-initGameStep1 = function(num) {
-    console.log("主机点击了人数选择：" + num);
-    originalInitStep1(num); // 执行原逻辑
-    syncGameState();        // 📡 立即发送同步信号！
-};
-
-// 2. 劫持“选择模式”按钮
-const originalSelectMode = selectMode;
-selectMode = function(m, el) {
-    console.log("主机点击了模式：" + m);
-    originalSelectMode(m, el);
-    syncGameState();        // 📡 立即发送同步信号！
-};
-
-// 3. 劫持“进入角色选择”按钮
-const originalToRoleSelect = toRoleSelect;
-toRoleSelect = function() {
-    console.log("主机进入角色选择");
-    originalToRoleSelect();
-    syncGameState();        // 📡 立即发送同步信号！
-};
-
-// 4. 劫持“确认角色”按钮
-const originalConfirmRole = confirmRole;
-confirmRole = function(pid, role) {
-    console.log("主机确认了角色");
-    originalConfirmRole(pid, role);
-    syncGameState();        // 📡 立即发送同步信号！
-};
-
-// 5. 劫持“转盘”按钮
-const originalSpinWheel = spinWheel;
-spinWheel = function() {
-    // 转盘比较特殊，我们只同步“开始转”这个动作是不够的
-    // 最好是主机转出结果后，把结果同步给对方
-    document.getElementById('spin-btn').disabled = true; 
-    
-    // 生成随机结果（由主机决定）
-    const rot = 1800 + Math.random() * 360; 
-    const w = document.getElementById('wheel');
-    w.style.transform = `rotate(-${rot}deg)`;
-    
-    // 计算结果ID
-    const idx = Math.floor((rot % 360) / (360 / START_SPOTS.length));
-    const res = START_SPOTS[idx];
-    
-    // 关键：告诉对方“我转到了这个角度，结果是这个”
-    if (conn && conn.open) {
-        conn.send({
-            type: 'SYNC_WHEEL',
-            rotation: rot,
-            resultId: res.id,
-            resultName: res.n
-        });
-    }
-
-    // 本地执行后续动画逻辑
-    setTimeout(() => {
-        const pid = game.players.findIndex(p => p.sid === null);
-        game.players[pid].sid = res.id;
-        document.getElementById('wheel-result').innerText = `出发: ${res.n}`;
-        
-        // 动画结束后，再同步一次全状态，确保数据一致
-        setTimeout(() => {
-            syncGameState();
-            if (pid < game.totalPlayers - 1) initWheel(pid + 1);
-            else startGame();
-        }, 1500);
-    }, 3000);
-};
-
-// 6. 接收端增加对“转盘同步”的处理
-// 我们需要扩展 handleConnection 里的监听
-if (conn) {
-    // 如果连接已经存在，重新绑定一下监听（这步比较hack，但有效）
-    const oldDataHandler = conn._events['data']; // 获取旧的监听器
-    conn.off('data'); // 移除旧的
-    
-    conn.on('data', (data) => {
-        console.log("收到数据类型:", data.type);
-        
-        if (data.type === 'SYNC_STATE') {
-            applyGameState(data.payload);
-        } 
-        else if (data.type === 'SHOW_MODAL') {
-            showModal(data.title, data.content, true);
-        }
-        else if (data.type === 'SYNC_WHEEL') {
-            // 对方转了转盘，我也跟着转
-            const w = document.getElementById('wheel');
-            w.style.transform = `rotate(-${data.rotation}deg)`;
-            document.getElementById('spin-btn').disabled = true;
-            document.getElementById('wheel-result').innerText = `出发: ${data.resultName}`;
-        }
-    });
-}
 </script>
 </body>
 </html>
