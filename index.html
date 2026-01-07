@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>广州地铁大富翁：2026终极版</title>
+    <title>广州地铁大富翁：2026联网版</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root {
             --bg-color: #121212;
@@ -14,7 +15,7 @@
         }
         body { margin: 0; background: var(--bg-color); font-family: 'Microsoft YaHei', sans-serif; color: white; overflow: hidden; touch-action: none; user-select: none; }
         
-        /* 通用 UI - 恢复原始样式 */
+        /* 通用 UI */
         .screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-color); z-index: 100; transition: opacity 0.4s; }
         .hidden { opacity: 0; pointer-events: none; z-index: -1; }
         h1, h2 { color: var(--highlight); text-align: center; text-shadow: 0 2px 5px black; }
@@ -22,20 +23,20 @@
         .btn:active { transform: scale(0.95); }
         .btn:disabled { background: #555; filter: grayscale(1); cursor: not-allowed; }
 
-        /* 卡片选择器 - 恢复原始网格布局 */
+        /* 卡片选择器 */
         .grid-select { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; max-width: 600px; padding: 10px; width: 90%; }
         .select-card { background: #333; padding: 15px; border-radius: 12px; border: 2px solid #444; text-align: center; cursor: pointer; transition: 0.2s; position: relative; }
         .select-card.selected { border-color: var(--highlight); background: #444; box-shadow: 0 0 15px rgba(255, 204, 0, 0.2); }
         .select-card.taken { opacity: 0.5; pointer-events: none; filter: grayscale(1); }
         .tag { font-size: 10px; background: #000; padding: 2px 5px; border-radius: 3px; position: absolute; top: 5px; right: 5px; }
 
-        /* 转盘 - 恢复原始比例 */
+        /* 转盘 */
         #wheel-wrapper { position: relative; width: 280px; height: 280px; margin: 30px; }
         #wheel { width: 100%; height: 100%; border-radius: 50%; border: 6px solid #eee; position: relative; overflow: hidden; background: #222; transition: transform 3s cubic-bezier(0.1, 0.7, 0.1, 1); }
         .wheel-sec { position: absolute; width: 50%; height: 50%; transform-origin: 100% 100%; left: 0; top: 0; border: 1px solid rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
         #wheel-pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 25px solid var(--highlight); z-index: 10; filter: drop-shadow(0 2px 2px black); }
 
-        /* 地图层 - 优化滚动与跳动过渡 */
+        /* 地图层 */
         #game-container { width: 100vw; height: 100vh; background: #1a1a1a; cursor: grab; overflow: scroll; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
         #game-container::-webkit-scrollbar { display: none; }
         .metro-line { fill: none; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; opacity: 0.8; }
@@ -51,10 +52,10 @@
         }
         @keyframes pulse { from { r: 12; opacity: 0.8; } to { r: 15; opacity: 1; } }
 
-        /* 玩家 Token - 动画时长缩短以匹配 tick 声 */
+        /* 玩家 Token */
         .player-token { r: 10; stroke: #fff; stroke-width: 2; transition: cx 0.25s linear, cy 0.25s linear; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8)); pointer-events: none; z-index: 50; }
 
-        /* 底部控制台 - 保持修复版布局 */
+        /* 底部控制台 */
         #ui-panel { 
             position: fixed; bottom: 0; left: 0; width: 100%; 
             background: var(--panel-bg); 
@@ -92,13 +93,19 @@
         /* 弹窗样式 */
         #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 199; display: none; }
         #modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2d2d2d; color: white; padding: 25px; width: 85%; max-width: 360px; border-radius: 16px; text-align: center; z-index: 200; display: none; border: 1px solid #555; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+
+        /* 联机面板样式 */
+        #net-panel input { box-sizing: border-box; }
+        .net-minimized { width: 40px !important; height: 40px !important; overflow: hidden; border-radius: 50% !important; padding: 0 !important; }
+        .net-minimized > div { display: none; }
+        .net-minimized::after { content: '📡'; display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 20px; }
     </style>
 </head>
 <body>
 
 <div id="screen-setup" class="screen">
     <h1>🚇 广州地铁大富翁</h1>
-    <p style="color:#aaa; margin-top:-10px">2026 跨年特别版</p>
+    <p style="color:#aaa; margin-top:-10px">2026 联网特别版</p>
     <div style="margin-top:30px">
         <button class="btn" onclick="initGameStep1(2)">2人对战</button>
         <button class="btn" onclick="initGameStep1(3)">3人局</button>
@@ -171,6 +178,28 @@
     <button class="btn" onclick="closeModal()">确定</button>
 </div>
 
+<div id="net-panel" style="position:fixed; top:10px; right:10px; background:rgba(0,0,0,0.9); padding:10px; border:1px solid #009b4c; border-radius:8px; z-index:9999; color:white; font-size:12px; width:200px; transition: all 0.3s;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h4 style="margin:0; color:#009b4c">📡 联机控制台</h4>
+        <span onclick="toggleNetPanel()" style="cursor:pointer; font-size:16px;">_</span>
+    </div>
+    
+    <div id="net-content">
+        <div id="net-init-box">
+            <p>你的ID: <span id="my-peer-id" style="color:#ffcc00; font-family:monospace; font-weight:bold;">获取中...</span></p>
+            <button class="btn" style="padding:5px 10px; font-size:12px; width:100%; margin:5px 0;" onclick="copyMyId()">复制我的ID</button>
+            <hr style="border-color:#444">
+            <input type="text" id="remote-id-input" placeholder="输入朋友的ID" style="width:100%; padding:5px; margin-bottom:5px; background:#333; border:1px solid #555; color:white; border-radius:4px;">
+            <button class="btn" style="padding:5px 10px; font-size:12px; width:100%; background:#006c9d; margin:5px 0;" onclick="connectToFriend()">连接朋友</button>
+        </div>
+
+        <div id="net-status-box" style="display:none; text-align:center; color:#009b4c; font-weight:bold; margin-top:10px;">
+            ✅ 已连接朋友！<br>
+            <span id="conn-role" style="font-size:10px; color:#aaa; font-weight:normal">屏幕已开始同步</span>
+        </div>
+    </div>
+</div>
+
 <script src="data.js"></script>
 <script>
 // 音效合成器
@@ -216,13 +245,14 @@ let game = {
 
 window.onload = () => buildGraph();
 
-function initGameStep1(num) { game.totalPlayers = num; showScreen('screen-mode'); }
+function initGameStep1(num) { game.totalPlayers = num; showScreen('screen-mode'); updateUI(); } // Hack: trigger sync
 function selectMode(m, el) {
     game.mode = m; game.target = (m==='work') ? 'zhujiang' : null;
     document.querySelectorAll('#screen-mode .select-card').forEach(c => c.classList.remove('selected'));
     el.classList.add('selected');
+    updateUI(); // Hack: trigger sync
 }
-function toRoleSelect() { renderRoleSelection(0); showScreen('screen-roles'); }
+function toRoleSelect() { renderRoleSelection(0); showScreen('screen-roles'); updateUI(); }
 
 function renderRoleSelection(pid) {
     const container = document.getElementById('role-container'); container.innerHTML = '';
@@ -240,6 +270,7 @@ function confirmRole(pid, role) {
     game.players.push({ id: pid, name: `玩家${pid+1}`, role: role, color: role.c, sid: null, skip: 0, speedBuff: false, money: 2000, buffs: [], isJailed: false, jailTurns: 0, isBankrupt: false });
     if (pid < game.totalPlayers - 1) renderRoleSelection(pid + 1);
     else initWheel(0);
+    updateUI(); // Hack: trigger sync
 }
 
 function initWheel(pid) {
@@ -404,13 +435,6 @@ function handleEvent(p, st) {
     }
     else if (st.ev === 'goto_jail' && p.role.id !== 'student') { p.sid = 'fangcun'; p.isJailed = true; renderPlayers(); centerCamera(p.sid); refreshUI = true; }
     else if (st.ev === 'speed_x2') { p.speedBuff = true; refreshUI = true; }
-    // 在 handleEvent 函数中补充
-    else if (st.ev === 'fly') {
-        const keys = Object.keys(STATIONS);
-        p.sid = keys[Math.floor(Math.random() * keys.length)];
-        msg += `<br>✈️ 瞬间移动到了：${STATIONS[p.sid].n}`;
-        renderPlayers(); centerCamera(p.sid);
-    }
 
     if (refreshUI) updateUI();
     if (p.money < 0) { p.isBankrupt = true; updateUI(); msg += "<br>破产！"; }
@@ -456,10 +480,12 @@ function renderPlayers() {
 function updateUI() {
     game.players.forEach((p, idx) => {
         const card = document.getElementById(`p-card-${idx}`);
-        document.getElementById(`p-money-${idx}`).innerText = `¥ ${p.money}`;
-        document.getElementById(`p-station-${idx}`).innerText = STATIONS[p.sid]?.n || '';
-        document.getElementById(`p-status-${idx}`).innerText = p.isBankrupt ? '☠️ 破产' : (p.skip > 0 ? '⏸ 暂停' : '');
-        idx === game.turn ? card.classList.add('active-turn') : card.classList.remove('active-turn');
+        if(card) { // Safety check
+            document.getElementById(`p-money-${idx}`).innerText = `¥ ${p.money}`;
+            document.getElementById(`p-station-${idx}`).innerText = STATIONS[p.sid]?.n || '';
+            document.getElementById(`p-status-${idx}`).innerText = p.isBankrupt ? '☠️ 破产' : (p.skip > 0 ? '⏸ 暂停' : '');
+            idx === game.turn ? card.classList.add('active-turn') : card.classList.remove('active-turn');
+        }
     });
 }
 
@@ -477,6 +503,136 @@ function initDevTool() {
         console.log(`x:${Math.round(p.x)}, y:${Math.round(p.y)}`);
     });
 }
+
+// ==========================================
+// 联机核心代码逻辑 (PeerJS)
+// ==========================================
+let peer = null;
+let conn = null;
+
+function initNetwork() {
+    const randomId = 'gz-' + Math.floor(Math.random() * 9000 + 1000);
+    peer = new Peer(randomId);
+
+    peer.on('open', (id) => {
+        document.getElementById('my-peer-id').innerText = id;
+    });
+
+    peer.on('connection', (c) => {
+        handleConnection(c);
+        showConnectedUI('对方已加入，你是房主');
+        // 如果游戏已经开始了，立刻同步状态给新来的人
+        if(game.players.length > 0) syncGameState();
+    });
+
+    peer.on('error', (err) => { alert('联机错误: ' + err.type); });
+}
+
+function connectToFriend() {
+    const friendId = document.getElementById('remote-id-input').value.trim();
+    if (!friendId) return alert('请输入朋友ID');
+    conn = peer.connect(friendId);
+    handleConnection(conn);
+    showConnectedUI('已连接对方');
+}
+
+function handleConnection(connection) {
+    conn = connection;
+    conn.on('data', (data) => {
+        if (data.type === 'SYNC_STATE') {
+            applyGameState(data.payload);
+        } else if (data.type === 'SHOW_MODAL') {
+            showModal(data.title, data.content, true);
+        }
+    });
+    conn.on('open', () => { if(game.players.length > 0) syncGameState(); });
+}
+
+function syncGameState() {
+    if (conn && conn.open) {
+        // 简单深拷贝，防止循环引用
+        const safeGame = JSON.parse(JSON.stringify(game));
+        conn.send({ type: 'SYNC_STATE', payload: safeGame });
+    }
+}
+
+function applyGameState(remoteGame) {
+    game.turn = remoteGame.turn;
+    game.players = remoteGame.players;
+    game.totalPlayers = remoteGame.totalPlayers;
+    game.mode = remoteGame.mode;
+    game.target = remoteGame.target;
+    
+    // 如果当前界面还是初始界面，强制跳转到游戏或选人界面
+    if(remoteGame.players.length > 0 && document.getElementById('screen-roles').classList.contains('hidden') && document.getElementById('screen-game').classList.contains('hidden')) {
+         if(remoteGame.players[0].sid) startGame(); 
+         else { showScreen('screen-roles'); renderRoleSelection(remoteGame.players.length-1); }
+    }
+    
+    if(!document.getElementById('screen-game').classList.contains('hidden')) {
+        renderMap();
+        initPlayerCards(); // 重新渲染玩家卡片防止找不到ID
+        renderPlayers();
+        centerCamera(game.players[game.turn].sid);
+    }
+    updateUI();
+}
+
+// 劫持 updateUI 以触发同步
+const originalUpdateUI = updateUI;
+updateUI = function() {
+    originalUpdateUI();
+    syncGameState();
+};
+
+// 劫持 showModal 以同步弹窗
+const originalShowModal = showModal;
+showModal = function(t, c, isFromNet = false) {
+    document.getElementById('modal-title').innerHTML = t;
+    document.getElementById('modal-content').innerHTML = c;
+    document.getElementById('modal-overlay').style.display = 'block';
+    document.getElementById('modal').style.display = 'block';
+    
+    if (!isFromNet && conn && conn.open) {
+        conn.send({ type: 'SHOW_MODAL', title: t, content: c });
+    }
+};
+
+// 劫持 closeModal
+const originalCloseModal = closeModal;
+closeModal = function() {
+    document.getElementById('modal-overlay').style.display = 'none';
+    document.getElementById('modal').style.display = 'none';
+    // 只有主动点击的人才触发 nextTurn，然后通过 updateUI 同步给对方
+    nextTurn(); 
+}
+
+// UI 辅助
+function copyMyId() {
+    const id = document.getElementById('my-peer-id').innerText;
+    navigator.clipboard.writeText(id).then(() => alert('已复制: ' + id));
+}
+
+function toggleNetPanel() {
+    const p = document.getElementById('net-panel');
+    const c = document.getElementById('net-content');
+    if (p.classList.contains('net-minimized')) {
+        p.classList.remove('net-minimized');
+        c.style.display = 'block';
+    } else {
+        p.classList.add('net-minimized');
+        c.style.display = 'none';
+    }
+}
+
+function showConnectedUI(msg) {
+    document.getElementById('net-init-box').style.display = 'none';
+    document.getElementById('net-status-box').style.display = 'block';
+    document.getElementById('conn-role').innerText = msg;
+}
+
+// 启动联机模块
+setTimeout(initNetwork, 1000);
 </script>
 </body>
 </html>
