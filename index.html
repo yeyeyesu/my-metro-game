@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>广州地铁大富翁：2026终极版</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: rgba(28, 28, 28, 0.98);
+            --accent: #009b4c;
+            --highlight: #ffcc00;
+            --danger: #ff4444;
+        }
+        body { margin: 0; background: var(--bg-color); font-family: 'Microsoft YaHei', sans-serif; color: white; overflow: hidden; touch-action: none; user-select: none; }
+        
+        /* 通用 UI - 恢复原始样式 */
+        .screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-color); z-index: 100; transition: opacity 0.4s; }
+        .hidden { opacity: 0; pointer-events: none; z-index: -1; }
+        h1, h2 { color: var(--highlight); text-align: center; text-shadow: 0 2px 5px black; }
+        .btn { background: linear-gradient(135deg, #009b4c, #007a3b); color: white; border: none; padding: 12px 32px; font-size: 18px; cursor: pointer; border-radius: 30px; margin: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.4); transition: transform 0.1s; }
+        .btn:active { transform: scale(0.95); }
+        .btn:disabled { background: #555; filter: grayscale(1); cursor: not-allowed; }
+
+        /* 卡片选择器 - 恢复原始网格布局 */
+        .grid-select { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; max-width: 600px; padding: 10px; width: 90%; }
+        .select-card { background: #333; padding: 15px; border-radius: 12px; border: 2px solid #444; text-align: center; cursor: pointer; transition: 0.2s; position: relative; }
+        .select-card.selected { border-color: var(--highlight); background: #444; box-shadow: 0 0 15px rgba(255, 204, 0, 0.2); }
+        .select-card.taken { opacity: 0.5; pointer-events: none; filter: grayscale(1); }
+        .tag { font-size: 10px; background: #000; padding: 2px 5px; border-radius: 3px; position: absolute; top: 5px; right: 5px; }
+
+        /* 转盘 - 恢复原始比例 */
+        #wheel-wrapper { position: relative; width: 280px; height: 280px; margin: 30px; }
+        #wheel { width: 100%; height: 100%; border-radius: 50%; border: 6px solid #eee; position: relative; overflow: hidden; background: #222; transition: transform 3s cubic-bezier(0.1, 0.7, 0.1, 1); }
+        .wheel-sec { position: absolute; width: 50%; height: 50%; transform-origin: 100% 100%; left: 0; top: 0; border: 1px solid rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
+        #wheel-pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 25px solid var(--highlight); z-index: 10; filter: drop-shadow(0 2px 2px black); }
+
+        /* 地图层 - 优化滚动与跳动过渡 */
+        #game-container { width: 100vw; height: 100vh; background: #1a1a1a; cursor: grab; overflow: scroll; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+        #game-container::-webkit-scrollbar { display: none; }
+        .metro-line { fill: none; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; opacity: 0.8; }
+        .station-group { cursor: pointer; transition: opacity 0.3s; }
+        .station-circle { fill: #fff; stroke: #333; stroke-width: 2; r: 5; transition: all 0.3s; }
+        .station-circle.transfer { r: 8; stroke-width: 3; }
+        .station-label { font-size: 11px; fill: #ddd; font-weight: bold; text-shadow: 1px 1px 2px #000; pointer-events: none; user-select: none; }
+        
+        .station-group.target-highlight .station-circle {
+            fill: var(--highlight); r: 14; stroke: white; stroke-width: 3;
+            filter: drop-shadow(0 0 15px var(--highlight));
+            animation: pulse 0.6s infinite alternate;
+        }
+        @keyframes pulse { from { r: 12; opacity: 0.8; } to { r: 15; opacity: 1; } }
+
+        /* 玩家 Token - 动画时长缩短以匹配 tick 声 */
+        .player-token { r: 10; stroke: #fff; stroke-width: 2; transition: cx 0.25s linear, cy 0.25s linear; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8)); pointer-events: none; z-index: 50; }
+
+        /* 底部控制台 - 保持修复版布局 */
+        #ui-panel { 
+            position: fixed; bottom: 0; left: 0; width: 100%; 
+            background: var(--panel-bg); 
+            padding: 10px 15px 20px 15px;
+            border-top: 1px solid #444; 
+            display: flex; flex-direction: column; gap: 10px;
+            z-index: 90; backdrop-filter: blur(10px); 
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+            box-sizing: border-box; 
+        }
+
+        #players-row { display: flex; gap: 10px; width: 100%; overflow-x: auto; padding: 5px 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        #players-row::-webkit-scrollbar { display: none; }
+
+        .p-card {
+            flex: 0 0 auto; width: 90px; background: #2a2a2a;
+            border: 2px solid #444; border-radius: 10px; padding: 8px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            transition: all 0.3s; opacity: 0.7; transform-origin: center;
+        }
+        .p-card.active-turn { border-color: var(--highlight); background: #3a3a3a; transform: scale(1.05); opacity: 1; box-shadow: 0 5px 15px rgba(255, 204, 0, 0.2); z-index: 2; }
+        .p-card.bankrupt { filter: grayscale(1); opacity: 0.3; border-color: #555; }
+
+        .p-name { font-size: 13px; font-weight: bold; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .p-money { font-size: 14px; color: var(--highlight); font-family: monospace; font-weight: bold; }
+        .p-station { font-size: 10px; color: #aaa; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .p-status { font-size: 10px; color: var(--danger); font-weight: bold; height: 14px; }
+
+        #controls-row { display: flex; align-items: center; justify-content: space-between; }
+        #ui-tip { flex: 1; color: var(--highlight); font-size: 14px; font-weight: bold; text-align: left; padding-left: 5px; }
+        #dice-group { display: flex; align-items: center; gap: 15px; }
+        #dice-box { width: 50px; height: 50px; background: white; color: black; border-radius: 10px; font-size: 28px; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 5px rgba(0,0,0,0.2); }
+        #roll-btn { margin: 0; padding: 10px 24px; font-size: 16px; }
+
+        /* 弹窗样式 */
+        #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 199; display: none; }
+        #modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2d2d2d; color: white; padding: 25px; width: 85%; max-width: 360px; border-radius: 16px; text-align: center; z-index: 200; display: none; border: 1px solid #555; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+    </style>
+</head>
+<body>
+
+<div id="screen-setup" class="screen">
+    <h1>🚇 广州地铁大富翁</h1>
+    <p style="color:#aaa; margin-top:-10px">2026 跨年特别版</p>
+    <div style="margin-top:30px">
+        <button class="btn" onclick="initGameStep1(2)">2人对战</button>
+        <button class="btn" onclick="initGameStep1(3)">3人局</button>
+        <button class="btn" onclick="initGameStep1(4)">4人乱斗</button>
+    </div>
+</div>
+
+<div id="screen-mode" class="screen hidden">
+    <h2>选择胜利目标</h2>
+    <div class="grid-select">
+        <div class="select-card selected" onclick="selectMode('work', this)">
+            <h3>💼 上班族</h3>
+            <p>终点：珠江新城</p>
+        </div>
+        <div class="select-card" onclick="selectMode('money', this)">
+            <h3>💰 淘金梦</h3>
+            <p>资金达到 ¥10000 获胜</p>
+        </div>
+    </div>
+    <button class="btn" style="margin-top:20px" onclick="toRoleSelect()">下一步</button>
+</div>
+
+<div id="screen-roles" class="screen hidden">
+    <h2><span id="role-player-name" style="color:var(--highlight)">玩家1</span> 选择身份</h2>
+    <div class="grid-select" id="role-container"></div>
+</div>
+
+<div id="screen-wheel" class="screen hidden">
+    <h2><span id="wheel-player">P1</span> 抽取出发点</h2>
+    <div id="wheel-wrapper">
+        <div id="wheel-pointer"></div>
+        <div id="wheel"></div>
+    </div>
+    <button id="spin-btn" class="btn" onclick="spinWheel()">转动命运</button>
+    <p id="wheel-result" style="height:20px; color:var(--highlight); font-weight:bold; margin-top:10px"></p>
+</div>
+
+<div id="screen-game" class="hidden">
+    <div id="game-container">
+        <svg id="metro-svg" width="2500" height="3000" viewBox="0 0 2500 3000">
+            <g id="layer-lines"></g>
+            <g id="layer-stations"></g>
+            <g id="layer-players"></g>
+        </svg>
+    </div>
+    <div id="ui-panel">
+        <div id="players-row"></div>
+        <div id="controls-row">
+            <div id="ui-tip">准备开始...</div>
+            <div id="dice-group">
+                <div id="dice-box">?</div>
+                <button id="roll-btn" class="btn" onclick="rollDice()">掷骰子</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="screen-end" class="screen hidden">
+    <h1>🏆 游戏结束 🏆</h1>
+    <h2 id="winner-name">玩家名</h2>
+    <div id="winner-role">角色身份</div>
+    <div id="end-stats-box" style="margin-top:20px"></div>
+    <button class="btn" onclick="location.reload()">返回主选单</button>
+</div>
+
+<div id="modal-overlay"></div>
+<div id="modal">
+    <h3 id="modal-title">标题</h3>
+    <div id="modal-content" style="margin:20px 0; font-size:15px; line-height:1.6">内容</div>
+    <button class="btn" onclick="closeModal()">确定</button>
+</div>
+
+<script src="data.js"></script>
+<script>
+// 音效合成器
+const SFX = {
+    ctx: null,
+    init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+    play(type) {
+        this.init(); const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.connect(gain); gain.connect(this.ctx.destination); const now = this.ctx.currentTime;
+        if(type === 'tick') {
+            osc.frequency.setValueAtTime(880, now); gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1); osc.start(); osc.stop(now + 0.1);
+        } else if(type === 'dice') {
+            osc.type = 'square'; osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(40, now + 0.2); gain.gain.setValueAtTime(0.05, now);
+            osc.start(); osc.stop(now + 0.2);
+        } else if(type === 'event') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(440, now);
+            osc.frequency.exponentialRampToValueAtTime(880, now + 0.3); gain.gain.setValueAtTime(0.1, now);
+            osc.start(); osc.stop(now + 0.3);
+        }
+    }
+};
+
+let ADJACENCY = {};
+function buildGraph() {
+    ADJACENCY = {};
+    for (let line in LINE_DEFS) {
+        let stations = LINE_DEFS[line];
+        for (let i = 0; i < stations.length; i++) {
+            let curr = stations[i]; if (!STATIONS[curr]) continue;
+            if (!ADJACENCY[curr]) ADJACENCY[curr] = [];
+            if (i > 0) ADJACENCY[curr].push(stations[i - 1]);
+            if (i < stations.length - 1) ADJACENCY[curr].push(stations[i + 1]);
+        }
+    }
+    for(let k in ADJACENCY) ADJACENCY[k] = [...new Set(ADJACENCY[k])];
+}
+
+let game = {
+    totalPlayers: 0, players: [], turn: 0, mode: 'work', target: 'zhujiang', validDestinations: [], pathMap: {}
+};
+
+window.onload = () => buildGraph();
+
+function initGameStep1(num) { game.totalPlayers = num; showScreen('screen-mode'); }
+function selectMode(m, el) {
+    game.mode = m; game.target = (m==='work') ? 'zhujiang' : null;
+    document.querySelectorAll('#screen-mode .select-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+}
+function toRoleSelect() { renderRoleSelection(0); showScreen('screen-roles'); }
+
+function renderRoleSelection(pid) {
+    const container = document.getElementById('role-container'); container.innerHTML = '';
+    document.getElementById('role-player-name').innerText = `玩家${pid+1}`;
+    ROLES.forEach(role => {
+        const isTaken = game.players.some(p => p.role.id === role.id);
+        const div = document.createElement('div'); div.className = `select-card ${isTaken ? 'taken' : ''}`;
+        if (!isTaken) div.onclick = () => confirmRole(pid, role);
+        div.innerHTML = `<h3 style="color:${role.c}; margin:5px 0">${role.n}</h3><p style="font-size:12px; color:#ccc">${role.d}</p>${isTaken ? '<span class="tag">已选</span>' : ''}`;
+        container.appendChild(div);
+    });
+}
+
+function confirmRole(pid, role) {
+    game.players.push({ id: pid, name: `玩家${pid+1}`, role: role, color: role.c, sid: null, skip: 0, speedBuff: false, money: 2000, buffs: [], isJailed: false, jailTurns: 0, isBankrupt: false });
+    if (pid < game.totalPlayers - 1) renderRoleSelection(pid + 1);
+    else initWheel(0);
+}
+
+function initWheel(pid) {
+    showScreen('screen-wheel'); const p = game.players[pid];
+    document.getElementById('wheel-player').innerText = p.name; document.getElementById('wheel-player').style.color = p.color;
+    document.getElementById('spin-btn').disabled = false; document.getElementById('wheel-result').innerText = '';
+    const w = document.getElementById('wheel'); w.innerHTML = '';
+    const deg = 360 / START_SPOTS.length;
+    START_SPOTS.forEach((s, i) => {
+        const d = document.createElement('div'); d.className = 'wheel-sec';
+        d.style.transform = `rotate(${i*deg}deg) skewY(-${90-deg}deg)`; d.style.background = s.c;
+        d.innerHTML = `<span style="transform: skewY(${90-deg}deg) rotate(${deg/2}deg); display:block; width:100px; text-align:center; padding-top:20px; font-weight:bold; color:white; text-shadow:1px 1px 2px black;">${s.n}</span>`;
+        w.appendChild(d);
+    });
+}
+
+function spinWheel() {
+    document.getElementById('spin-btn').disabled = true; const w = document.getElementById('wheel');
+    const rot = 1800 + Math.random() * 360; w.style.transform = `rotate(-${rot}deg)`;
+    setTimeout(() => {
+        const idx = Math.floor((rot % 360) / (360 / START_SPOTS.length));
+        const res = START_SPOTS[idx]; const pid = game.players.findIndex(p => p.sid === null);
+        game.players[pid].sid = res.id; document.getElementById('wheel-result').innerText = `出发: ${res.n}`;
+        setTimeout(() => {
+            if (pid < game.totalPlayers - 1) initWheel(pid + 1);
+            else startGame();
+        }, 1500);
+    }, 3000);
+}
+
+function startGame() {
+    renderMap(); renderPlayers(); initPlayerCards(); showScreen('screen-game'); updateUI();
+    centerCamera(game.players[0].sid);
+}
+
+function centerCamera(sid) {
+    const container = document.getElementById('game-container'); const s = STATIONS[sid]; if(!s) return;
+    container.scrollTo({ left: s.x - container.clientWidth / 2, top: s.y - container.clientHeight / 2, behavior: 'smooth' });
+}
+
+function initPlayerCards() {
+    const row = document.getElementById('players-row'); row.innerHTML = '';
+    game.players.forEach((p, idx) => {
+        const card = document.createElement('div'); card.className = 'p-card'; card.id = `p-card-${idx}`;
+        card.innerHTML = `<div class="p-name" style="color:${p.color}">${p.name}</div><div class="p-money" id="p-money-${idx}">¥ 2000</div><div class="p-station" id="p-station-${idx}">...</div><div class="p-status" id="p-status-${idx}"></div>`;
+        row.appendChild(card);
+    });
+}
+
+function rollDice() {
+    const p = game.players[game.turn];
+    if (p.role.id === 'student') { p.skip = 0; p.isJailed = false; }
+    if (p.isJailed) {
+        let val = Math.floor(Math.random()*6)+1; document.getElementById('dice-box').innerText = val;
+        if (val % 2 === 0) { p.isJailed = false; showModal('出院', '双数出院！'); }
+        else { p.jailTurns++; showModal('继续治疗', '单数，继续反省。'); return; }
+    }
+    if (p.skip > 0) { p.skip--; showModal('暂停', '原地休息。'); return; }
+    
+    SFX.play('dice'); document.getElementById('roll-btn').disabled = true;
+    let count = 0; const timer = setInterval(() => {
+        document.getElementById('dice-box').innerText = Math.floor(Math.random()*6)+1;
+        if(++count > 10) {
+            clearInterval(timer); let val = parseInt(document.getElementById('dice-box').innerText);
+            let steps = p.speedBuff ? val * 2 : val; p.speedBuff = false;
+            calculateDestinations(p, steps);
+        }
+    }, 50);
+}
+
+function calculateDestinations(p, steps) {
+    game.validDestinations = []; game.pathMap = {};
+    let queue = [{ curr: p.sid, prev: null, stepsLeft: steps, path: [] }];
+    let visited = new Set();
+    while(queue.length > 0) {
+        let item = queue.shift();
+        if (item.stepsLeft === 0) {
+            if (!game.validDestinations.includes(item.curr)) { game.validDestinations.push(item.curr); game.pathMap[item.curr] = item.path; }
+            continue;
+        }
+        let key = `${item.curr}_${item.stepsLeft}`; if (visited.has(key)) continue; visited.add(key);
+        let neighbors = ADJACENCY[item.curr] || [];
+        let validNext = neighbors.length === 1 ? neighbors : neighbors.filter(n => n !== item.prev);
+        validNext.forEach(next => { queue.push({ curr: next, prev: item.curr, stepsLeft: item.stepsLeft - 1, path: [...item.path, next] }); });
+    }
+    const isAuto = Math.random() < 0.5;
+    if (isAuto) {
+        const target = game.validDestinations[Math.floor(Math.random()*game.validDestinations.length)];
+        document.getElementById('ui-tip').innerText = `🤖 自动移动中...`;
+        setTimeout(() => movePlayer(target), 800);
+    } else {
+        highlightDestinations(true); document.getElementById('ui-tip').innerText = `🖱️ 请手动选择目的地`;
+    }
+}
+
+function highlightDestinations(active) {
+    document.querySelectorAll('.station-group').forEach(el => { el.classList.remove('target-highlight'); el.onclick = null; });
+    if (active) {
+        game.validDestinations.forEach(sid => {
+            const el = document.getElementById(`st-${sid}`);
+            if (el) { el.classList.add('target-highlight'); el.onclick = () => movePlayer(sid); }
+        });
+    }
+}
+
+async function movePlayer(targetSid) {
+    highlightDestinations(false); const p = game.players[game.turn]; const path = game.pathMap[targetSid] || [targetSid];
+    for (let nextSid of path) { p.sid = nextSid; renderPlayers(); SFX.play('tick'); centerCamera(nextSid); updateUI(); await new Promise(r => setTimeout(r, 300)); }
+    if (game.mode === 'work' && p.sid === game.target) { showModal('胜利', '到达珠江新城！'); setTimeout(() => endGame(p), 2000); }
+    else { setTimeout(() => handleEvent(p, STATIONS[p.sid]), 300); }
+}
+
+function forceMove(p, steps) {
+    let curr = p.sid; for(let i=0; i<Math.abs(steps); i++) { let n = ADJACENCY[curr]; if(n && n.length > 0) curr = n[0]; }
+    p.sid = curr; renderPlayers(); centerCamera(curr); return STATIONS[curr].n;
+}
+
+function handleEvent(p, st) {
+    SFX.play('event'); let msg = st.desc || st.n + "：平安无事。";
+    let title = st.n; let refreshUI = false;
+    const isLine1 = LINE_DEFS[1].includes(p.sid);
+
+    if (p.role.id === 'worker' && p.sid === 'zhujiang') { p.money += 500; msg += "<br>奖金 ¥500"; refreshUI = true; }
+    if (p.role.id === 'landlord' && (p.sid === 'kecun' || p.sid === 'datang')) { p.money += 400; msg += "<br>收租 ¥400"; refreshUI = true; }
+
+    if (!st.ev) { showModal(title, msg); updateUI(); return; }
+
+    if (st.ev.startsWith('stop_')) {
+        if (p.role.id !== 'student') { p.skip += parseInt(st.ev.split('_')[1]); }
+        else { msg += "<br><b>[特种兵免疫暂停]</b>"; }
+        refreshUI = true;
+    }
+    else if (st.ev.startsWith('move_f_')) { let name = forceMove(p, parseInt(st.ev.split('_')[2])); msg += `<br>前进至：${name}`; refreshUI = true; }
+    else if (st.ev.startsWith('move_b_')) { let name = forceMove(p, -parseInt(st.ev.split('_')[2])); msg += `<br>退回至：${name}`; refreshUI = true; }
+    else if (st.ev === 'event_kecun') {
+        let d = Math.floor(Math.random()*6)+1;
+        if(d<=2) { p.money += 500; msg += `<br>掷出${d}：奖励500`; }
+        else if(d<=4) { if(p.role.id!=='student') p.skip+=1; msg += `<br>掷出${d}：拥挤暂停`; }
+        else { p.money -= 500; msg += `<br>掷出${d}：罚款500`; }
+        refreshUI = true;
+    }
+    else if (st.ev === 'jump_wenhua') { p.sid = 'wenhuagongyuan'; renderPlayers(); centerCamera(p.sid); refreshUI = true; }
+    else if (st.ev === 'card_get' || st.ev === 'gov') {
+        const card = CHANCE_CARDS[Math.floor(Math.random()*CHANCE_CARDS.length)];
+        title = "机会卡"; msg = card.content;
+        if(card.money !== 0) { 
+            let val = (p.role.id === 'local' && isLine1 && card.money > 0) ? card.money * 2 : card.money;
+            p.money += val; msg += ` (¥${val})`;
+        }
+        if(card.move !== 0) forceMove(p, card.move);
+        if(card.stop !== 0 && p.role.id !== 'student') p.skip += card.stop;
+        refreshUI = true;
+    }
+    else if (st.ev.startsWith('money_get_')) {
+        let v = parseInt(st.ev.split('_')[2]); if(p.role.id === 'local' && isLine1) v *= 2;
+        p.money += v; refreshUI = true;
+    }
+    else if (st.ev.startsWith('money_lose_')) { p.money -= parseInt(st.ev.split('_')[2]); refreshUI = true; }
+    else if (st.ev === 'rent') {
+        if(p.role.id === 'landlord') p.money += 500;
+        else p.money -= 300; refreshUI = true;
+    }
+    else if (st.ev === 'goto_jail' && p.role.id !== 'student') { p.sid = 'fangcun'; p.isJailed = true; renderPlayers(); centerCamera(p.sid); refreshUI = true; }
+    else if (st.ev === 'speed_x2') { p.speedBuff = true; refreshUI = true; }
+    // 在 handleEvent 函数中补充
+    else if (st.ev === 'fly') {
+        const keys = Object.keys(STATIONS);
+        p.sid = keys[Math.floor(Math.random() * keys.length)];
+        msg += `<br>✈️ 瞬间移动到了：${STATIONS[p.sid].n}`;
+        renderPlayers(); centerCamera(p.sid);
+    }
+
+    if (refreshUI) updateUI();
+    if (p.money < 0) { p.isBankrupt = true; updateUI(); msg += "<br>破产！"; }
+    showModal(title, msg);
+}
+
+function nextTurn() {
+    do { game.turn = (game.turn + 1) % game.totalPlayers; } while (game.players[game.turn].isBankrupt);
+    updateUI(); document.getElementById('roll-btn').disabled = false; document.getElementById('dice-box').innerText = '?';
+    centerCamera(game.players[game.turn].sid);
+}
+
+function renderMap() {
+    const lLines = document.getElementById('layer-lines'), lStations = document.getElementById('layer-stations');
+    lLines.innerHTML = ''; lStations.innerHTML = '';
+    for (let lid in LINE_DEFS) {
+        let d = ""; let pts = 0;
+        LINE_DEFS[lid].forEach(sid => { if(!STATIONS[sid]) return; d += (pts++ === 0 ? "M":"L") + `${STATIONS[sid].x},${STATIONS[sid].y} `; });
+        const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        p.setAttribute("d", d); p.setAttribute("class", "metro-line"); p.setAttribute("stroke", COLORS[lid]); lLines.appendChild(p);
+    }
+    for (let sid in STATIONS) {
+        const s = STATIONS[sid], g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        g.id = `st-${sid}`; g.className.baseVal = 'station-group';
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        c.setAttribute("cx", s.x); c.setAttribute("cy", s.y); c.className.baseVal = `station-circle ${s.t?'transfer':''}`;
+        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        t.setAttribute("x", s.x); t.setAttribute("y", s.y + 15); t.setAttribute("text-anchor", "middle"); t.className.baseVal = 'station-label'; t.textContent = s.n;
+        g.appendChild(c); g.appendChild(t); lStations.appendChild(g);
+    }
+}
+
+function renderPlayers() {
+    const layer = document.getElementById('layer-players'); layer.innerHTML = '';
+    game.players.forEach((p, i) => {
+        if(!p.sid || p.isBankrupt) return;
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle"); const s = STATIONS[p.sid];
+        c.setAttribute("cx", s.x + (i*6-9)); c.setAttribute("cy", s.y); c.setAttribute("fill", p.color); c.className.baseVal = 'player-token';
+        layer.appendChild(c);
+    });
+}
+
+function updateUI() {
+    game.players.forEach((p, idx) => {
+        const card = document.getElementById(`p-card-${idx}`);
+        document.getElementById(`p-money-${idx}`).innerText = `¥ ${p.money}`;
+        document.getElementById(`p-station-${idx}`).innerText = STATIONS[p.sid]?.n || '';
+        document.getElementById(`p-status-${idx}`).innerText = p.isBankrupt ? '☠️ 破产' : (p.skip > 0 ? '⏸ 暂停' : '');
+        idx === game.turn ? card.classList.add('active-turn') : card.classList.remove('active-turn');
+    });
+}
+
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+function showModal(t, c) { document.getElementById('modal-title').innerHTML = t; document.getElementById('modal-content').innerHTML = c; document.getElementById('modal-overlay').style.display = 'block'; document.getElementById('modal').style.display = 'block'; }
+function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; document.getElementById('modal').style.display = 'none'; nextTurn(); }
+
+function endGame(winner) { showScreen('screen-end'); document.getElementById('winner-name').innerText = winner.name; document.getElementById('winner-role').innerText = winner.role.n; }
+
+function initDevTool() {
+    document.getElementById('game-container').addEventListener('click', e => {
+        if(e.target.tagName !== 'svg') return;
+        const svg = document.getElementById('metro-svg'), pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+        const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+        console.log(`x:${Math.round(p.x)}, y:${Math.round(p.y)}`);
+    });
+}
+</script>
+</body>
+</html>
