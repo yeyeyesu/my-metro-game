@@ -3,40 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>广州地铁大富翁：2026联网版</title>
+    <title>广州地铁大富翁：2026联网修复版</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        :root {
-            --bg-color: #121212;
-            --panel-bg: rgba(28, 28, 28, 0.98);
-            --accent: #009b4c;
-            --highlight: #ffcc00;
-            --danger: #ff4444;
-        }
+        :root { --bg-color: #121212; --panel-bg: rgba(28, 28, 28, 0.98); --accent: #009b4c; --highlight: #ffcc00; --danger: #ff4444; }
         body { margin: 0; background: var(--bg-color); font-family: 'Microsoft YaHei', sans-serif; color: white; overflow: hidden; touch-action: none; user-select: none; }
-        
-        /* 通用 UI */
         .screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-color); z-index: 100; transition: opacity 0.4s; }
         .hidden { opacity: 0; pointer-events: none; z-index: -1; }
         h1, h2 { color: var(--highlight); text-align: center; text-shadow: 0 2px 5px black; }
         .btn { background: linear-gradient(135deg, #009b4c, #007a3b); color: white; border: none; padding: 12px 32px; font-size: 18px; cursor: pointer; border-radius: 30px; margin: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.4); transition: transform 0.1s; }
         .btn:active { transform: scale(0.95); }
         .btn:disabled { background: #555; filter: grayscale(1); cursor: not-allowed; }
-
-        /* 卡片选择器 */
         .grid-select { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; max-width: 600px; padding: 10px; width: 90%; }
         .select-card { background: #333; padding: 15px; border-radius: 12px; border: 2px solid #444; text-align: center; cursor: pointer; transition: 0.2s; position: relative; }
         .select-card.selected { border-color: var(--highlight); background: #444; box-shadow: 0 0 15px rgba(255, 204, 0, 0.2); }
         .select-card.taken { opacity: 0.5; pointer-events: none; filter: grayscale(1); }
         .tag { font-size: 10px; background: #000; padding: 2px 5px; border-radius: 3px; position: absolute; top: 5px; right: 5px; }
-
-        /* 转盘 */
         #wheel-wrapper { position: relative; width: 280px; height: 280px; margin: 30px; }
         #wheel { width: 100%; height: 100%; border-radius: 50%; border: 6px solid #eee; position: relative; overflow: hidden; background: #222; transition: transform 3s cubic-bezier(0.1, 0.7, 0.1, 1); }
         .wheel-sec { position: absolute; width: 50%; height: 50%; transform-origin: 100% 100%; left: 0; top: 0; border: 1px solid rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
         #wheel-pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 25px solid var(--highlight); z-index: 10; filter: drop-shadow(0 2px 2px black); }
-
-        /* 地图层 */
         #game-container { width: 100vw; height: 100vh; background: #1a1a1a; cursor: grab; overflow: scroll; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
         #game-container::-webkit-scrollbar { display: none; }
         .metro-line { fill: none; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; opacity: 0.8; }
@@ -44,57 +30,26 @@
         .station-circle { fill: #fff; stroke: #333; stroke-width: 2; r: 5; transition: all 0.3s; }
         .station-circle.transfer { r: 8; stroke-width: 3; }
         .station-label { font-size: 11px; fill: #ddd; font-weight: bold; text-shadow: 1px 1px 2px #000; pointer-events: none; user-select: none; }
-        
-        .station-group.target-highlight .station-circle {
-            fill: var(--highlight); r: 14; stroke: white; stroke-width: 3;
-            filter: drop-shadow(0 0 15px var(--highlight));
-            animation: pulse 0.6s infinite alternate;
-        }
+        .station-group.target-highlight .station-circle { fill: var(--highlight); r: 14; stroke: white; stroke-width: 3; filter: drop-shadow(0 0 15px var(--highlight)); animation: pulse 0.6s infinite alternate; }
         @keyframes pulse { from { r: 12; opacity: 0.8; } to { r: 15; opacity: 1; } }
-
-        /* 玩家 Token */
         .player-token { r: 10; stroke: #fff; stroke-width: 2; transition: cx 0.25s linear, cy 0.25s linear; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8)); pointer-events: none; z-index: 50; }
-
-        /* 底部控制台 */
-        #ui-panel { 
-            position: fixed; bottom: 0; left: 0; width: 100%; 
-            background: var(--panel-bg); 
-            padding: 10px 15px 20px 15px;
-            border-top: 1px solid #444; 
-            display: flex; flex-direction: column; gap: 10px;
-            z-index: 90; backdrop-filter: blur(10px); 
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
-            box-sizing: border-box; 
-        }
-
+        #ui-panel { position: fixed; bottom: 0; left: 0; width: 100%; background: var(--panel-bg); padding: 10px 15px 20px 15px; border-top: 1px solid #444; display: flex; flex-direction: column; gap: 10px; z-index: 90; backdrop-filter: blur(10px); box-shadow: 0 -5px 20px rgba(0,0,0,0.5); box-sizing: border-box; }
         #players-row { display: flex; gap: 10px; width: 100%; overflow-x: auto; padding: 5px 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
         #players-row::-webkit-scrollbar { display: none; }
-
-        .p-card {
-            flex: 0 0 auto; width: 90px; background: #2a2a2a;
-            border: 2px solid #444; border-radius: 10px; padding: 8px;
-            display: flex; flex-direction: column; justify-content: space-between;
-            transition: all 0.3s; opacity: 0.7; transform-origin: center;
-        }
+        .p-card { flex: 0 0 auto; width: 90px; background: #2a2a2a; border: 2px solid #444; border-radius: 10px; padding: 8px; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.3s; opacity: 0.7; transform-origin: center; }
         .p-card.active-turn { border-color: var(--highlight); background: #3a3a3a; transform: scale(1.05); opacity: 1; box-shadow: 0 5px 15px rgba(255, 204, 0, 0.2); z-index: 2; }
         .p-card.bankrupt { filter: grayscale(1); opacity: 0.3; border-color: #555; }
-
         .p-name { font-size: 13px; font-weight: bold; margin-bottom: 4px; display: flex; justify-content: space-between; }
         .p-money { font-size: 14px; color: var(--highlight); font-family: monospace; font-weight: bold; }
         .p-station { font-size: 10px; color: #aaa; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .p-status { font-size: 10px; color: var(--danger); font-weight: bold; height: 14px; }
-
         #controls-row { display: flex; align-items: center; justify-content: space-between; }
         #ui-tip { flex: 1; color: var(--highlight); font-size: 14px; font-weight: bold; text-align: left; padding-left: 5px; }
         #dice-group { display: flex; align-items: center; gap: 15px; }
         #dice-box { width: 50px; height: 50px; background: white; color: black; border-radius: 10px; font-size: 28px; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 5px rgba(0,0,0,0.2); }
         #roll-btn { margin: 0; padding: 10px 24px; font-size: 16px; }
-
-        /* 弹窗样式 */
         #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 199; display: none; }
         #modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2d2d2d; color: white; padding: 25px; width: 85%; max-width: 360px; border-radius: 16px; text-align: center; z-index: 200; display: none; border: 1px solid #555; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
-
-        /* 联机面板样式 */
         #net-panel input { box-sizing: border-box; }
         .net-minimized { width: 40px !important; height: 40px !important; overflow: hidden; border-radius: 50% !important; padding: 0 !important; }
         .net-minimized > div { display: none; }
@@ -105,7 +60,7 @@
 
 <div id="screen-setup" class="screen">
     <h1>🚇 广州地铁大富翁</h1>
-    <p style="color:#aaa; margin-top:-10px">2026 联网特别版</p>
+    <p style="color:#aaa; margin-top:-10px">2026 联网修复版</p>
     <div style="margin-top:30px">
         <button class="btn" onclick="initGameStep1(2)">2人对战</button>
         <button class="btn" onclick="initGameStep1(3)">3人局</button>
@@ -183,7 +138,6 @@
         <h4 style="margin:0; color:#009b4c">📡 联机控制台</h4>
         <span onclick="toggleNetPanel()" style="cursor:pointer; font-size:16px;">_</span>
     </div>
-    
     <div id="net-content">
         <div id="net-init-box">
             <p>你的ID: <span id="my-peer-id" style="color:#ffcc00; font-family:monospace; font-weight:bold;">获取中...</span></p>
@@ -192,19 +146,49 @@
             <input type="text" id="remote-id-input" placeholder="输入朋友的ID" style="width:100%; padding:5px; margin-bottom:5px; background:#333; border:1px solid #555; color:white; border-radius:4px;">
             <button class="btn" style="padding:5px 10px; font-size:12px; width:100%; background:#006c9d; margin:5px 0;" onclick="connectToFriend()">连接朋友</button>
         </div>
-
         <div id="net-status-box" style="display:none; text-align:center; color:#009b4c; font-weight:bold; margin-top:10px;">
             ✅ 已连接朋友！<br>
-            <span id="conn-role" style="font-size:10px; color:#aaa; font-weight:normal">屏幕已开始同步</span>
+            <span id="conn-role" style="font-size:10px; color:#aaa; font-weight:normal">屏幕同步中...</span>
         </div>
     </div>
 </div>
 
-<script src="data.js"></script>
 <script>
-// ==========================================
-// 1. 基础工具与音效
-// ==========================================
+/* ============================================================
+   内嵌数据 (原 data.js 内容，防止加载失败)
+   ============================================================ */
+const COLORS={1:'#f3d03e',2:'#006c9d',3:'#f7941d','3z':'#f7941d',5:'#c5003e',6:'#833178',8:'#008583',18:'#004a98',4:'#00863f',7:'#9fb62d',9:'#78c694',10:'#7d9bc1',11:'#482684',12:'#77892b','12s':'#77892b',13:'#8e8c13',14:'#81312f','14z':'#81312f',21:'#2f2e78',22:'#d65636','gf':'#c3cc17','apm':'#00b5e2'};
+const STATIONS={
+'xilang':{n:'西塱',x:549,y:1719,t:true,ev:'start',desc:'起点：广佛同城的第一站。'},'kengkou':{n:'坑口',x:552,y:1669,ev:'stop_1',desc:'客运站拉客太多，被堵住了。暂停一回合。'},'huadiwan':{n:'花地湾',x:552,y:1629,ev:'money_get_500',desc:'买花运气爆棚，转手赚了¥500。'},'fangcun':{n:'芳村',x:554,y:1557,t:true,ev:'money_lose_50',desc:'花地湾已成回忆，支付¥50情怀税。'},'huangsha':{n:'黄沙',x:554,y:1448,t:true,ev:'jump_wenhua',desc:'海鲜市场太腥了！速速逃离至文化公园。'},'changshoulu':{n:'长寿路',x:554,y:1389,ev:'stop_1',desc:'恒宝广场饮早茶，排队排到脚软。暂停一回合。'},'chenjiaci':{n:'陈家祠',x:585,y:1343,t:true,ev:'money_get_150',desc:'欣赏岭南建筑瑰宝，文化自信！奖励¥150。'},'ximenkou':{n:'西门口',x:640,y:1346,ev:'buff_next_roll_plus',desc:'路过光孝寺，心静自然凉。下一次掷骰点数+1。'},'gongyuanqian':{n:'公园前',x:686,y:1346,t:true,ev:'move_f_2',desc:'动漫星城看到Cosplay，心情好！前进2步。'},'nongjiangsuo':{n:'农讲所',x:761,y:1340,ev:'card_get',desc:'参观红墙绿瓦，获得一张机会卡。'},'martyrs':{n:'烈士陵园',x:815,y:1343,ev:'money_lose_200',desc:'去中华广场买手机，消费¥200。'},'dongshankou':{n:'东山口',x:906,y:1343,t:true,ev:'stop_1',desc:'潮人太多，潮到风湿。暂停一回合。'},'yangji':{n:'杨箕',x:968,y:1346,t:true,ev:'stop_1',desc:'1号线换5号线走到怀疑人生。暂停一回合。'},'tiyuxilu':{n:'体育西路',x:1128,y:1284,t:true,ev:'event_tiyuxi',desc:'地狱西大乱斗！掷骰子决定命运。'},'tiyuzhongxin':{n:'体育中心',x:1219,y:1200,ev:'money_get_200',desc:'看天河城球赛赢了！获得¥200。'},'guangzhoudong':{n:'广州东站',x:1123,y:1153,t:true,ev:'transport',desc:'在此休息，等待发车。'},
+'guangzhounan':{n:'广州南站',x:857,y:2014,t:true,ev:'stop_2',desc:'行李箱太多被撞骨折。暂停2回合。'},'shibi':{n:'石壁',x:859,y:1952,t:true,ev:'nothing',desc:'周围比较荒凉，平安无事。'},'huijiang':{n:'会江',x:862, y:1896, ev:'money_lose_100', desc:'巨大创意园加班，支付¥100咖啡钱。'},'nanpu':{n:'南浦',x:859,y:1855,ev:'move_b_1',desc:'大桥堵车了，后退1步。'},'luoxi':{n:'洛溪',x:857,y:1821,ev:'money_get_50',desc:'食在洛溪，心情不错。恢复体力(¥50)。'},'nanzhou':{n:'南洲',x:857,y:1768,t:true,ev:'interchange',desc:'换乘广佛线，休息片刻。'},'dongxiaonan':{n:'东晓南',x:857,y:1715,t:true,ev:'money_get_50',desc:'美食街吃宵夜，体力恢复(¥50)。'},'jiangtai':{n:'江泰路',x:859,y:1675,t:true,ev:'money_get_100',desc:'万科里逛街捡到钱，获得¥100。'},'changgang':{n:'昌岗',x:857,y:1616,t:true,ev:'money_get_100',desc:'美院看展览，精神奖励¥100。'},'jiangnanxi':{n:'江南西',x:846,y:1563,ev:'money_lose_300',desc:'网红店排队打卡，消费¥300。'},'shiergong':{n:'市二宫',x:802,y:1517,ev:'money_lose_200',desc:'婚纱街看别人结婚，随份子钱¥200。'},'haizhu':{n:'海珠广场',x:766,y:1476,t:true,ev:'move_f_1',desc:'夜游珠江，风光无限。前进1步。'},'jiniantang':{n:'纪念堂',x:684,y:1281,ev:'card_get',desc:'瞻仰中山纪念堂，获得机会卡。'},'yuexiupark':{n:'越秀公园',x:686,y:1237,ev:'move_f_1',desc:'呼吸新鲜空气。前进1步。'},'guangzhouhuo':{n:'广州火车站',x:686,y:1160,t:true,ev:'move_b_2',desc:'黑佬香水味太熏。后退2步。'},'sanyuanli':{n:'三元里',x:699,y:1094,ev:'money_get_300',desc:'皮具城进货成功，赚了¥300。'},'feixiang':{n:'飞翔公园',x:735,y:1057,ev:'money_lose_200',desc:'万达广场购物，消费¥200。'},'baiyunpark':{n:'白云公园',x:769,y:1020,ev:'move_b_1',desc:'儿童公园被小孩吵死。后退1步。'},'baiyuncal':{n:'白云文化',x:800,y:983,t:true,ev:'card_get',desc:'看演唱会，获得一张机会卡。'},'xiaogang':{n:'萧岗',x:844,y:930,ev:'nothing',desc:'这里主要是住宅区，无事发生。'},'jiangxia':{n:'江夏',x:880,y:883,ev:'rent',desc:'很多广漂住这，交房租¥300。'},'huangbian':{n:'黄边',x:916,y:843,ev:'money_lose_200',desc:'去律师大厦咨询法律问题，花费¥200。'},'jiahewanggang':{n:'嘉禾望岗',x:970,y:781,t:true,ev:'nothing',desc:'青春的分岔口。准备换乘。'},
+'jichangbei':{n:'机场北',x:919,y:389,ev:'fly',desc:'准备登机出国。下回合直接飞往随机站点。'},'jichangnan':{n:'机场南',x:952,y:448,ev:'move_b_3',desc:'接机送错航站楼，狂奔！后退3步。'},'gaozeng':{n:'高增',x:965,y:560,t:true,ev:'interchange',desc:'换乘9号线去花都。'},'renhe':{n:'人和',x:963,y:638,ev:'money_get_50',desc:'吃华侨美食，心情不错(¥50)。'},'longgui':{n:'龙归',x:963,y:700,ev:'stop_1',desc:'线路又长又晃又没网。暂停一回合。'},'baiyundadao':{n:'白云大道北',x:1040,y:840,ev:'money_get_100',desc:'去爬白云山，身体健康(¥100)。'},'yongtai':{n:'永泰',x:1087,y:893,ev:'money_get_50',desc:'吃个快餐，体力恢复(¥50)。'},'tonghe':{n:'同和',x:1123,y:961,ev:'rent',desc:'早高峰进站限流，迟到扣工资¥200。'},'jingxi':{n:'京溪南方医院',x:1128,y:1020,ev:'move_f_1',desc:'捡到能量饮料。前进1步。'},'meihuayuan':{n:'梅花园',x:1126,y:1060,ev:'move_f_2',desc:'欧爱凝珠又香又干净。前进2步。'},'yantang':{n:'燕塘',x:1126,y:1110,t:true,ev:'stop_1',desc:'牛马太多，被挤下地铁。暂停一回合。'},'linhexi':{n:'林和西',x:1126,y:1212,t:true,ev:'move_b_1',desc:'早餐被别人吃了一口。后退1步。'},'zhujiang':{n:'珠江新城',x:1126,y:1405,t:true,ev:'money_lose_10',desc:'西装革履跑业务汗流浃背。支付¥10买纸巾。'},'guangzhouta':{n:'广州塔',x:1128,y:1470,t:true,ev:'goto_jail',desc:'被广州塔激光射中！送往精神病院。'},'kecun':{n:'客村',x:1123,y:1613,t:true,ev:'event_kecun',desc:'客村奇遇：福祸相依。'},'datang':{n:'大塘',x:1123,y:1688,t:true,ev:'buff_niuza',desc:'城中村烟火气，花费¥80买牛杂，获免租Buff。'},'lijiao':{n:'沥滘',x:1123,y:1775,t:true,ev:'interchange',desc:'终于可以换乘广佛线了。'},'xiajiao':{n:'厦滘',x:1128,y:1840,ev:'move_f_2',desc:'成功在限流前挤上地铁，窃喜。前进2步。'},'dashi':{n:'大石',x:1151,y:1883,ev:'rent',desc:'城中村握手楼，信号不好，错过¥200红包。'},'hanxi':{n:'汉溪长隆',x:1182,y:1917,t:true,ev:'move_f_3_stop_1',desc:'长隆游玩好心情，前进3步，但玩累了暂停一局。'},'shiqiao':{n:'市桥',x:1307,y:1992,ev:'money_lose_200',desc:'去买珠宝首饰，消费¥200。'},'panyu':{n:'番禺广场',x:1412,y:2001,t:true,ev:'money_get_200',desc:'番禺区府办事顺利。获得¥200。'},'bangjiang':{n:'傍江',x:1508,y:1995,ev:'nothing',desc:'正在建设中，尘土飞扬。'},'shiqinan':{n:'石碁南',x:1588,y:1995,ev:'nothing',desc:'等待亚运大道扩建。'},'haiyonglu':{n:'海涌路',x:1671,y:1995,ev:'nothing',desc:'看风景。'},'haibang':{n:'海傍',x:1756,y:1998,t:true,ev:'nothing',desc:'亚运村旧址，怀念2010年。'},
+'tianhekeyun':{n:'天河客运站',x:1322,y:1094,t:true,ev:'stop_1',desc:'坐大巴回老家。暂停一回合。'},'wushan':{n:'五山',x:1312,y:1138,ev:'card_get',desc:'华工肯德基复习。获得机会卡。'},'huashi':{n:'华师',x:1307,y:1191,t:true,ev:'move_f_1',desc:'天桥底下全是外卖车。小心翼翼前进1步。'},'gangding':{n:'岗顶',x:1283,y:1228,ev:'money_lose_200',desc:'电脑城买显卡被坑。损失¥200。'},'shipaiqiao':{n:'石牌桥',x:1244,y:1225,ev:'money_lose_50',desc:'泪。支付¥50“情感损失费”。'},
+'nansha_keyun':{n:'南沙客运港',x:2165,y:2346,ev:'money_get_100',desc:'最美地铁站打卡。奖励¥100。'},'nanheng':{n:'南横',x:2108,y:2352,ev:'nothing',desc:'海风吹拂。'},'tangkeng':{n:'塘坑',x:2064,y:2352,ev:'nothing',desc:'南沙老街逛一逛。'},'dashan':{n:'大涌',x:2028,y:2334,ev:'nothing',desc:'安静的站点。'},'guanglong':{n:'广隆',x:1999,y:2306,ev:'nothing',desc:'工业区。'},'feishajiao':{n:'飞沙角',x:1971,y:2265,ev:'nothing',desc:'名字很好听，但周围没啥。'},'jinzhou':{n:'金洲',x:1945,y:2225,ev:'money_lose_200',desc:'万达广场吃喝玩乐，消费¥200。'},'jiaomen':{n:'蕉门',x:1919,y:2200,ev:'gov',desc:'南沙区政府办事。获得机会卡。'},'huangge':{n:'黄阁',x:1893,y:2169,ev:'money_lose_200',desc:'汽车城看新车。给200小费。'},'huanggechuan':{n:'黄阁汽车城',x:1873,y:2132,ev:'speed_x2',desc:'试驾新车，速度飙升！下回合步数x2。'},'qingsheng':{n:'庆盛',x:1844,y:2104,t:true,ev:'transport',desc:'换乘高铁。'},'dongchong':{n:'东涌',x:1811,y:2066,ev:'money_lose_50',desc:'水乡风情，吃农家菜(¥50)。'},'dichong':{n:'低涌',x:1787,y:2035,ev:'speed_x2',desc:'看高铁飞驰而过，感受速度。下一次移动步数x2。'},'shiqi':{n:'石碁',x:1733,y:1967,ev:'nothing',desc:'又是石碁。'},'guanqiao':{n:'官桥',x:1694,y:1924,ev:'future',desc:'未来佛莞城际换乘点。'},'xinzao':{n:'新造',x:1663,y:1883,ev:'move_f_1',desc:'暨大校区很大。前进1步。'},'daxuecheng_nan':{n:'大学城南',x:1614,y:1830,t:true,ev:'money_get_20',desc:'工大广工饭堂蹭饭。省下¥20饭钱。'},'daxuecheng_bei':{n:'大学城北',x:1575,y:1781,ev:'card_get',desc:'中大华师学霸多。获得机会卡。'},'guanzhou':{n:'官洲',x:1542,y:1737,t:true,ev:'money_get_50',desc:'生物岛骑单车，身心健康(¥50)。'},'wanshengwei':{n:'万胜围',x:1534,y:1557,t:true,ev:'stop_1',desc:'坐有轨电车看日落。暂停欣赏一回合。'},'chebeinan':{n:'车陂南',x:1537,y:1393,t:true,ev:'move_b_1',desc:'4号5号线换乘大军。被挤退1步。'},'chebei':{n:'车陂',x:1534,y:1290,t:true,ev:'money_get_200',desc:'城中村房租便宜。获得¥200生活费。'},'huangcun':{n:'黄村',x:1534,y:1237,t:true,ev:'money_lose_200',desc:'奥体中心看比赛。花费¥200门票。'},
+'jiaokou':{n:'滘口',x:417,y:1414,ev:'stop_1',desc:'佛山候鸟大军。拥挤，暂停一回合。'},'tanwei':{n:'坦尾',x:464,y:1355,t:true,ev:'money_get_100',desc:'在桥上看江景，心情舒畅(¥100)。'},'zhongshanba':{n:'中山八',x:526,y:1287,t:true,ev:'money_lose_200',desc:'童装批发市场。给亲戚小孩买衣服花费¥200。'},'xichang':{n:'西场',x:546,y:1231,ev:'money_get_50',desc:'老西关美食。恢复体力(¥50)。'},'xicun':{n:'西村',x:580,y:1169,t:true,ev:'interchange',desc:'换乘8号线，路途遥远。'},'xiaobei':{n:'小北',x:779,y:1203,ev:'card_get',desc:'感受国际化氛围。获得机会卡。'},'taojin':{n:'淘金',x:852,y:1243,ev:'money_get_100',desc:'曾经的CBD，喝杯咖啡休息一下。获得¥100。'},'quzhuang':{n:'区庄',x:934,y:1243,t:true,ev:'move_f_1',desc:'复杂的立交桥看晕了。下回合只能前进1步。'},'dongwuyuan':{n:'动物园',x:970,y:1281,ev:'money_get_100',desc:'看动物心情好。奖励¥100。'},'wuyangcun':{n:'五羊邨',x:999,y:1408,t:true,ev:'rent',desc:'住在CBD旁边，房租感人。支付¥300。'},'liede':{n:'猎德',x:1247,y:1399,ev:'money_get_200',desc:'遇到房东大爷，发了个红包¥200。'},'tancun':{n:'潭村',x:1325,y:1405,ev:'money_lose_10',desc:'路过高端小区感叹房价。支付¥10“柠檬税”。'},'yuancun':{n:'员村',x:1410,y:1408,t:true,ev:'move_b_1',desc:'红砖厂已不在，文艺青年落泪。后退1步。'},'keyunlu':{n:'科韵路',x:1477,y:1408,ev:'stop_1',desc:'程序员加班圣地。暂停一回合写代码。'},'dongpu':{n:'东圃',x:1606,y:1402,ev:'money_get_50',desc:'吃宵夜，充满活力(¥50)。'},'sanxi':{n:'三溪',x:1653,y:1408,ev:'move_f_2',desc:'路过山姆试吃，能量满满！前进2步。'},'yuzhu':{n:'鱼珠',x:1697,y:1408,t:true,ev:'nothing',desc:'木材市场，无事发生。'},'dashadi':{n:'大沙地',x:1759,y:1411,ev:'money_lose_100',desc:'老黄埔商业街，买点东西(¥100)。'},'dashadong':{n:'大沙东',x:1805,y:1402,t:true,ev:'gov',desc:'黄埔区府办事。获得机会卡。'},'wenchong':{n:'文冲',x:1857,y:1439,ev:'money_get_100',desc:'到达终点区域，奖励100块。'},'shuangsha':{n:'双沙',x:1898,y:1486,ev:'nothing',desc:'安静的站点。'},'miaotou':{n:'庙头',x:1945,y:1538,ev:'money_get_50',desc:'南海神庙就在附近，心情好。'},'xiayuan':{n:'夏园',x:1989,y:1585,t:true,ev:'nothing',desc:'转乘BRT，方便快捷。'},'baoying':{n:'保盈大道',x:2012,y:1653,ev:'nothing',desc:'开发区工业园。'},'xiagang':{n:'夏港',x:2007,y:1719,ev:'nothing',desc:'开发区工业园。'},'huangpuxingang':{n:'黄埔新港',x:2007,y:1793,ev:'nothing',desc:'看大船，吹海风。'},
+'xunfenggang':{n:'浔峰岗',x:391,y:1088,t:true,ev:'money_get_50',desc:'山清水秀。恢复心情(¥50)。'},'hengsha':{n:'横沙',x:430,y:1156,ev:'nothing',desc:'金沙洲居住区。'},'shabei':{n:'沙贝',x:430,y:1222,ev:'stop_1',desc:'金沙洲大桥堵车！暂停一回合。'},'hesha':{n:'河沙',x:430,y:1284,ev:'nothing',desc:'老城区边缘。'},'ruyifang':{n:'如意坊',x:513,y:1399,t:true,ev:'nothing',desc:'期待隧道开通。'},'wenhuagongyuan':{n:'文化公园',x:658,y:1483,t:true,ev:'move_f_2',desc:'夜游珠江，心旷神怡。前进2步。'},'yide':{n:'一德路',x:722,y:1483,ev:'money_lose_200',desc:'买海味和玩具，花费¥200。'},'beijinglu':{n:'北京路',x:828,y:1483,ev:'money_lose_100',desc:'步行街吃喝玩乐，消费¥100。'},'tuanyida':{n:'团一大',x:885,y:1483,ev:'move_f_2',desc:'致敬革命新青年。前进2步。'},'donghu':{n:'东湖',x:908,y:1430,t:true,ev:'money_get_50',desc:'东山湖公园划船。恢复心情(¥50)。'},'huanghuagang':{n:'黄花岗',x:960,y:1209,ev:'money_get_50',desc:'缅怀先烈，精神激励(¥50)。'},'shaheding':{n:'沙河顶',x:989,y:1181,ev:'money_lose_100',desc:'服装批发，买衣服花费¥100。'},'shahe':{n:'沙河',x:1020,y:1156,t:true,ev:'nothing',desc:'还没开通？(假装开通了) 拿货去。'},'tianpingjia':{n:'天平架',x:1071,y:1113,ev:'money_get_50',desc:'水果批发市场买水果。恢复体力(¥50)。'},'changban':{n:'长湴',x:1363,y:1042,ev:'nothing',desc:'城中村。'},'zhiwuyuan':{n:'植物园',x:1397,y:995,ev:'money_get_100',desc:'华南植物园吸氧。恢复状态(¥100)。'},'longdong':{n:'龙洞',x:1459,y:952,ev:'money_get_50',desc:'步行街吃小吃。恢复体力(¥50)。'},'kemulang':{n:'柯木塱',x:1534,y:952,ev:'nothing',desc:'火炉山脚下。'},'gaotangshi':{n:'高塘石',x:1588,y:952,ev:'money_get_100',desc:'网易大厦在附近，接了个外包赚¥100。'},'huangpei':{n:'黄陂',x:1637,y:942,ev:'nothing',desc:'天河湿地公园。'},'jinfeng':{n:'金峰',x:1687,y:939,ev:'nothing',desc:'万科城居住区。'},'xiangang':{n:'暹岗',x:1738,y:976,ev:'money_lose_100',desc:'去中山三院体检，花费¥100。'},'suyuan':{n:'苏元',x:1767,y:1011,t:true,ev:'card_get',desc:'宝能演艺中心看演出。获得机会卡。'},'luogang':{n:'萝岗',x:1795,y:1054,t:true,ev:'money_get_50',desc:'香雪公园看梅花。心情好(¥50)。'},'xiangxue':{n:'香雪',x:1937,y:1057,ev:'end',desc:'6号线终点。'},
+'meididadao':{n:'美的大道',x:662,y:2195,ev:'start',desc:'顺德起点。'},'beijiao':{n:'北滘公园',x:665,y:2256,ev:'money_get_50',desc:'逛和美术馆，艺术熏陶(¥50)。'},'midea':{n:'美的',x:711,y:2274,ev:'money_get_100',desc:'参观500强企业。获得纪念品(¥100)。'},'nanchong':{n:'南涌',x:753,y:2234,ev:'nothing',desc:'顺德水乡。'},'jinlong':{n:'锦龙',x:780,y:2198,ev:'nothing',desc:'陈村居住区。'},'chencun':{n:'陈村',x:804,y:2162,ev:'card_get',desc:'陈村花卉世界。获得机会卡。'},'chencunbei':{n:'陈村北',x:841,y:2122,ev:'future',desc:'换乘佛山11号线(未开通)。'},'dazhou':{n:'大洲',x:874,y:2086,ev:'nothing',desc:'风景不错。'},'xiecun':{n:'谢村',x:970,y:1926,ev:'nothing',desc:'去看足球场(还在建吗?)。'},'zhongcun':{n:'钟村',x:1073,y:1926,ev:'money_get_50',desc:'吃三宝，美味(¥50)。'},'nancun':{n:'南村万博',x:1345,y:1915,t:true,ev:'stop_1',desc:'站内换乘太久，走到腿断。停留1局。'},'yuangang':{n:'员岗',x:1466,y:1926,ev:'rent',desc:'房租便宜但人多。交租¥200。'},'banqiao':{n:'板桥',x:1547,y:1886,ev:'nothing',desc:'安静的村落。'},'shenjing':{n:'深井',x:1662,y:1770,ev:'money_get_50',desc:'吃深井烧鹅！奖励¥50。'},'changzhou':{n:'长洲',x:1725,y:1694,ev:'money_get_100',desc:'黄埔军校旧址。获得爱国Buff(¥100)。'},'yufengwei':{n:'裕丰围',x:1773,y:1632,t:true,ev:'nothing',desc:'港口繁忙。'},'jizhang':{n:'姬堂',x:1807,y:1299,ev:'nothing',desc:'由于施工道路封闭。'},'jiazhuang':{n:'加庄',x:1804,y:1215,ev:'nothing',desc:'科学城边缘。'},'kefenglu':{n:'科丰路',x:1804,y:1128,ev:'nothing',desc:'孵化器路演。'},'shuixi':{n:'水西',x:1807,y:969,t:true,ev:'gov',desc:'黄埔区府。获得机会卡。'},'yanshan':{n:'燕山',x:1801,y:900,ev:'end',desc:'7号线二期终点。'},
+'jiaoxin':{n:'滘心',x:575,y:762,ev:'start',desc:'白云湖公园。'},'tinggang':{n:'亭岗',x:575,y:799,ev:'nothing',desc:'物流园。'},'shijing':{n:'石井',x:572,y:843,ev:'money_lose_200',desc:'路面交通拥堵，打车上班。支付¥200。'},'xiaoping':{n:'小坪',x:575,y:902,ev:'nothing',desc:'火车站改造区，施工中。'},'shitan':{n:'石潭',x:578,y:942,ev:'nothing',desc:'地下车站。'},'julong':{n:'聚龙',x:580,y:998,t:true,ev:'money_lose_100',desc:'鞋城买鞋。花费¥100。'},'shangbu':{n:'上步',x:578,y:1042,ev:'nothing',desc:'老城区。'},'tongde':{n:'同德',x:578,y:1082,ev:'nothing',desc:'同德围解围了！'},'ezhangtan':{n:'鹅掌坦',x:575,y:1125,ev:'nothing',desc:'服装仓库。'},'caihongqiao':{n:'彩虹桥',x:583,y:1234,t:true,ev:'money_get_50',desc:'流花湖公园散步(¥50)。'},'hualinsi':{n:'华林寺',x:619,y:1420,ev:'money_get_100',desc:'拜玉器街的佛。求得平安(¥100)。'},'tongfuxi':{n:'同福西',x:696,y:1514,ev:'money_get_50',desc:'骑楼老街美食多(¥50)。'},'fenghuang':{n:'凤凰新村',x:725,y:1557,ev:'nothing',desc:'工业大道社畜的家。'},'shayuan':{n:'沙园',x:761,y:1597,t:true,ev:'event_shayuan',desc:'巨大十字路口。触发换乘事件。'},'baogang':{n:'宝岗大道',x:805,y:1619,ev:'nothing',desc:'海珠老城区。'},'xiaogang8':{n:'晓港',x:914,y:1622,ev:'nothing',desc:'美院布匹市场。'},'zhongda':{n:'中大',x:945,y:1622,ev:'stop_1',desc:'布匹市场电动车太多，堵住了。暂停一回合。'},'lujiang':{n:'鹭江',x:1056,y:1616,ev:'nothing',desc:'康乐村人山人海。'},'chigang':{n:'赤岗',x:1177,y:1588,t:true,ev:'nothing',desc:'省二医。'},'modiesha':{n:'磨碟沙',x:1257,y:1557,t:true,ev:'stop_1',desc:'微信总部加班3小时。停留1局。'},'xingangdong':{n:'新港东',x:1314,y:1554,ev:'nothing',desc:'广交会展馆。'},'pazhou':{n:'琶洲',x:1389,y:1554,t:true,ev:'money_get_200',desc:'互联网大厂聚集。获得¥200加班费。'},
+'feieling':{n:'飞鹅岭',x:270,y:489,ev:'nothing',desc:'风神汽车城。'},'huaduziche':{n:'花都汽车城',x:335,y:495,ev:'nothing',desc:'又是汽车城。'},'guangzhoubei':{n:'广州北站',x:389,y:486,t:true,ev:'transport',desc:'不如南站大，但人少。'},'huachenglu':{n:'花城路',x:461,y:458,ev:'nothing',desc:'花都老城区。'},'huaguoshan':{n:'花果山公园',x:497,y:414,ev:'money_get_50',desc:'没有猴子，但风景不错(¥50)。'},'huaduguang':{n:'花都广场',x:606,y:408,ev:'gov',desc:'花都区府。获得机会卡。'},'maanshan':{n:'马鞍山公园',x:689,y:393,ev:'money_get_50',desc:'爬山运动(¥50)。'},'liantang':{n:'莲塘',x:774,y:439,ev:'money_lose_50',desc:'吃花都美食(¥50)。'},'qingbu':{n:'清布',x:821,y:486,ev:'nothing',desc:'离机场很近了。'},'qingtang':{n:'清塘',x:859,y:535,ev:'nothing',desc:'曾是个幽灵站。'},
+'huawei':{n:'花围',x:624,y:1743,ev:'nothing',desc:'花卉交易市场周边。'},'dongsha':{n:'东沙',x:684,y:1737,ev:'nothing',desc:'东沙港附近。'},'daganwei':{n:'大干围',x:733,y:1740,ev:'nothing',desc:'江边散步。'},'gongyedadaonan':{n:'工业大道南',x:815,y:1734,ev:'money_lose_100',desc:'老工业区改造，路况复杂刮到底盘。损失¥100。'},'wufeng':{n:'五凤',x:955,y:1688,t:true,ev:'nothing',desc:'布匹辅料市场，人车混杂。'},'zhongdananmen':{n:'中大南门',x:955,y:1632,ev:'card_get',desc:'中山大学，学术氛围浓厚。获得机会卡。'},'binjiangdong':{n:'滨江东路',x:950,y:1532,ev:'money_get_100',desc:'一线江景豪宅区，心情舒畅(¥100)。'},'yangjidong':{n:'杨箕东',x:1030,y:1358,ev:'nothing',desc:'梅东路附近。'},
+'chisha':{n:'赤沙',x:1330,y:1629,t:true,ev:'nothing',desc:'车辆段上盖。'},'tianhepark':{n:'天河公园',x:1400,y:1284,t:true,ev:'stop_1',desc:'误入相亲角，被大爷大妈围观。暂停一回合。'},'huajinglu':{n:'华景路',x:1363,y:1240,ev:'stop_1',desc:'BRT堵车严重。暂停一回合。'},'longkouxi':{n:'龙口西',x:1239,y:1153,ev:'money_lose_50',desc:'岗顶美食圈(¥50)。'},'yuntai':{n:'云台花园',x:963,y:1150,ev:'move_f_1',desc:'白云山脚赏花。前进1步。'},'dajinzhong':{n:'大金钟路',x:898,y:1153,ev:'nothing',desc:'白云山边。'},'zhongyiyao':{n:'中医药大学',x:833,y:1153,ev:'money_get_100',desc:'养生之道。恢复体力(¥100)。'},'ziyuangang':{n:'梓元岗',x:751,y:1153,ev:'money_lose_200',desc:'皮具城商圈买包。消费¥200。'},'liuhua':{n:'流花路',x:629,y:1188,ev:'money_lose_200',desc:'服装批发市场进货。消费¥200。'},'shiweitang':{n:'石围塘',x:513,y:1479,ev:'money_get_100',desc:'百年火车站，去茶叶市场喝茶。花费¥100。'},'dachongkou':{n:'大冲口',x:590,y:1619,ev:'nothing',desc:'芳村居住区。'},'shayong':{n:'沙涌',x:616,y:1669,t:true,ev:'nothing',desc:'换乘广佛线。'},'hedongdong':{n:'鹤洞东',x:663,y:1684,ev:'nothing',desc:'广钢遗址。'},'diyuan':{n:'棣园',x:715,y:1684,ev:'nothing',desc:'南箕路附近。'},'yangang':{n:'燕岗',x:746,y:1684,t:true,ev:'money_get_50',desc:'燕子岗体育场运动一下(¥50)。'},'yijinglu':{n:'逸景路',x:1014,y:1691,ev:'stop_1',desc:'又是中大布匹商圈。拥挤，暂停一回合。'},'shangyong':{n:'上涌',x:1082,y:1678,ev:'nothing',desc:'果树公园。'},'longtan':{n:'龙潭',x:1257,y:1694,t:true,ev:'interchange',desc:'换乘18号线，速度起飞。'},
+'xunfenggangbei':{n:'浔峰岗北',x:433,y:1032,ev:'nothing',desc:'金沙洲北部。'},'xizhou':{n:'西洲',x:500,y:1007,ev:'nothing',desc:'白云区西部。'},'guangzhoubaiyun':{n:'广州白云站',x:650,y:945,t:true,ev:'transport',desc:'超级枢纽，也是迷宫。'},'tangyong':{n:'棠涌',x:720,y:902,ev:'nothing',desc:'棠溪村。'},'xinshixu':{n:'新市墟',x:766,y:939,t:true,ev:'nothing',desc:'百信广场人潮汹涌。'},'guangzhoutiyuguan':{n:'广州体育馆',x:839,y:1054,ev:'money_lose_200',desc:'看明星演唱会，门票¥200。'},'ershadao':{n:'二沙岛',x:978,y:1486,ev:'money_get_100',desc:'全广州最富的地方。在草坪听音乐会，奖励¥100。'},'chigangta':{n:'赤岗塔',x:1141,y:1532,ev:'nothing',desc:'仰望广州塔。'},'chishabei':{n:'赤沙北',x:1275,y:1629,ev:'nothing',desc:'会展中心南面。'},'beishan':{n:'北山',x:1462,y:1688,ev:'nothing',desc:'城中村美食。'},
+'tangxia':{n:'棠下',x:1495,y:1296,ev:'money_get_100',desc:'很多打工人的第一站。房租便宜¥100。'},'tianhezhucun':{n:'天河珠村',x:1637,y:1346,ev:'money_get_50',desc:'乞巧文化节(¥50)。'},'shuanggang':{n:'双岗',x:1852,y:1597,ev:'nothing',desc:'黄埔居住区。'},'nanhai':{n:'南海神庙',x:1914,y:1638,ev:'card_get',desc:'波罗诞庙会，求个上上签。获得机会卡。'},'nanagang':{n:'南岗',x:2046,y:1489,ev:'money_lose_200',desc:'万达广场购物。消费¥200。'},'shacun':{n:'沙村',x:2105,y:1414,ev:'nothing',desc:'凤凰城大社区。'},'baijiang':{n:'白江',x:2173,y:1349,ev:'nothing',desc:'新塘大道。'},'xintang':{n:'新塘',x:2229,y:1281,ev:'money_lose_50',desc:'牛仔裤之都，买条裤子¥50。'},'guanhu':{n:'官湖',x:2307,y:1256,ev:'nothing',desc:'车辆段。'},'xinsha':{n:'新沙',x:2364,y:1256,ev:'end',desc:'13号线终点。'},
+'lejialu':{n:'乐嘉路',x:691,y:1029,ev:'nothing',desc:'旧机场路。'},'yunxiaolu':{n:'云霄路',x:733,y:995,ev:'money_lose_200',desc:'停机坪购物广场。消费¥200。'},'mawu':{n:'马务',x:797,y:908,ev:'nothing',desc:'创意园。'},'hebian':{n:'鹤边',x:833,y:871,ev:'money_lose_100',desc:'法务区咨询。花费¥100。'},'helong':{n:'鹤龙',x:864,y:827,ev:'nothing',desc:'106国道。'},'pengbian':{n:'彭边',x:895,y:787,ev:'nothing',desc:'设计之都。'},'baiyundongping':{n:'白云东平',x:1095,y:765,ev:'nothing',desc:'东平村。'},'xialiang':{n:'夏良',x:1203,y:759,ev:'interchange',desc:'龙归城。'},'taihe':{n:'太和',x:1327,y:681,ev:'money_get_50',desc:'太和烧鸡，美味！恢复体力(¥50)。'},'zhuliao':{n:'竹料',x:1410,y:594,ev:'nothing',desc:'比较偏远。'},'zhongluotan':{n:'钟落潭',x:1467,y:501,ev:'card_get',desc:'职教城，好多学校。获得机会卡。'},'mali':{n:'马沥',x:1518,y:442,ev:'nothing',desc:'这里也有学校。'},'xinhe':{n:'新和',x:1581,y:368,t:true,ev:'interchange',desc:'换乘知识城线。'},'taiping':{n:'太平',x:1637,y:306,ev:'nothing',desc:'北回归线塔。'},'shengang':{n:'神岗',x:1676,y:253,ev:'nothing',desc:'神岗墟。'},'chicao':{n:'赤草',x:1720,y:206,ev:'nothing',desc:'逸泉山庄。'},'conghuakeyun':{n:'从化客运站',x:1764,y:160,ev:'stop_1',desc:'快到温泉镇了，泡温泉去。暂停一回合享受。'},'dongfeng':{n:'东风',x:1803,y:104,ev:'end',desc:'广州最北的地铁站。'},
+'hongwei':{n:'红卫',x:1738,y:386,ev:'nothing',desc:'由于偏远，周围全是工厂。'},'xinnan':{n:'新南',x:1774,y:439,ev:'interchange',desc:'换乘穗莞深城际。'},'fengxia':{n:'枫下',x:1805,y:476,ev:'nothing',desc:'村落。'},'zhishicheng':{n:'知识城',x:1842,y:514,ev:'card_get',desc:'中新知识城。高科技企业面试。获得机会卡。'},'hetangxia':{n:'何棠下',x:1878,y:554,ev:'nothing',desc:'大型居住区。'},'wangcun':{n:'旺村',x:1901,y:604,ev:'money_get_100',desc:'科技园面试成功。获得¥100。'},'tangcun':{n:'汤村',x:1937,y:632,ev:'nothing',desc:'商学院。'},'zhenlongbei':{n:'镇龙北',x:1979,y:681,ev:'nothing',desc:'车辆段。'},'zhenlong':{n:'镇龙',x:2074,y:684,t:true,ev:'interchange',desc:'换乘21号线。'},
+'wanqingsha':{n:'万顷沙',x:1860,y:2393,ev:'end',desc:'广州最南端。吃个南沙香蕉。'},'hengli':{n:'横沥',x:1650,y:2287,ev:'money_get_500',desc:'看着像荒地，其实是未来的金融岛。投资地产，奖励¥500。'},'shaxi':{n:'沙溪',x:1278,y:1846,ev:'money_lose_200',desc:'买酒店用品。消费¥200。'},'xiancun':{n:'冼村',x:1247,y:1306,ev:'money_get_200',desc:'土豪村。周围全是工地，但很有钱(¥200)。'},
+'tangdong':{n:'棠东',x:1490,y:1240,ev:'rent',desc:'城中村，打工人聚集地。房租¥200。'},'daguannan':{n:'大观南路',x:1583,y:1175,ev:'nothing',desc:'路边全是卖车的。'},'tianhezhineng':{n:'天河智慧城',x:1583,y:1085,ev:'money_get_50',desc:'网易总部。抓个痒痒鼠(¥50)。'},'shenzhou':{n:'神舟路',x:1632,y:1035,ev:'nothing',desc:'科技园。'},'kexuecheng':{n:'科学城',x:1699,y:1032,ev:'stop_1',desc:'世界500强聚集。加班一回合。'},'changping':{n:'长平',x:1847,y:905,ev:'nothing',desc:'有轨电车换乘。'},'jinkeng':{n:'金坑',x:1914,y:812,ev:'money_get_50',desc:'这里有个疗养院。恢复体力(¥50)。'},'zhenlongxi':{n:'镇龙西',x:1981,y:734,ev:'nothing',desc:'路过。'},'zhonggang':{n:'中新',x:2118,y:691,ev:'nothing',desc:'中新知识城南大门。'},'kengbei':{n:'坑贝',x:2167,y:694,ev:'nothing',desc:'古村落。'},'fenggang':{n:'凤岗',x:2206,y:688,ev:'nothing',desc:'朱村科教城。'},'zhucun':{n:'朱村',x:2255,y:697,ev:'money_get_50',desc:'吃著名的朱村鸡饭。恢复体力(¥50)。'},'shantian':{n:'山田',x:2307,y:697,ev:'nothing',desc:'这里以前叫象岭。'},'zhonggang21':{n:'钟岗',x:2353,y:697,ev:'nothing',desc:'快到终点了。'},'zengcheng':{n:'增城广场',x:2408,y:700,ev:'money_get_1000',desc:'增城挂绿荔枝！一颗拍卖几十万。获得巨额资金¥1000。'},
+'nanjiao':{n:'南漖',x:609,y:1799,ev:'nothing',desc:'船厂附近。'},'nanpu_22':{n:'南浦西',x:663,y:1871,ev:'nothing',desc:'还没开发好。'},'chentougang':{n:'陈头岗',x:715,y:1924,ev:'nothing',desc:'车辆段上盖。'},'shiguanglu':{n:'市广路',x:1177,y:2001,ev:'nothing',desc:'祈福新村，中国第一邨。'},
+'haixinsha':{n:'海心沙',x:1195,y:1445,ev:'money_get_100',desc:'亚运开幕式场馆。'},'opera':{n:'大剧院',x:1195,y:1414,ev:'money_lose_200',desc:'看一场歌剧，陶冶情操。花费¥200。'},'huacheng':{n:'花城大道',x:1195,y:1374,ev:'money_get_1000',desc:'CBD核心区。上班领工资¥1000。'},'women':{n:'妇儿中心',x:1195,y:1337,ev:'nothing',desc:'带娃看病。'},'huangpu':{n:'黄埔大道',x:1195,y:1306,ev:'nothing',desc:'地下空间很大。'},'tianhenan':{n:'天河南',x:1195,y:1271,ev:'money_lose_500',desc:'天环广场。买了台iPhone，花费¥500。'},'tiyuzhongxin_s':{n:'体育中心南',x:1198,y:1234,ev:'money_get_50',desc:'天河体育中心。奖励50.'},
+'xinchengdong':{n:'新城东',x:474,y:2113,ev:'start',desc:'佛山新城。世纪莲体育馆。'},'dongping':{n:'东平',x:409,y:2119,t:true,ev:'interchange',desc:'换乘佛山3号线。'},'shijilian':{n:'世纪莲',x:329,y:2116,ev:'money_lose_200',desc:'看演唱会，门票¥200。'},'lanshi':{n:'澜石',x:288,y:2073,ev:'nothing',desc:'不锈钢交易中心。'},'kuiqilu':{n:'魁奇路',x:298,y:2017,t:true,ev:'interchange',desc:'换乘佛山2号线。'},'jihuayuan':{n:'季华园',x:296,y:1964,ev:'money_get_50',desc:'季华公园散步(¥50)。'},'tongji':{n:'同济路',x:298,y:1920,ev:'money_get_100',desc:'行通济，冇闭翳。获得好运Buff(¥100)。'},'zumiao':{n:'祖庙',x:296,y:1868,ev:'money_get_100',desc:'看黄飞鸿醒狮表演，吃双皮奶。奖励¥100。'},'pujunbei':{n:'普君北路',x:345,y:1855,ev:'nothing',desc:'佛山老城区。'},'chaoan':{n:'朝安',x:381,y:1865,ev:'money_lose_100',desc:'买童装花费¥100。'},'guicheng':{n:'桂城',x:425,y:1868,t:true,ev:'money_lose_200',desc:'凯德广场购物。消费¥200。'},'nangui':{n:'南桂路',x:430,y:1827,ev:'nothing',desc:'很多楼盘。'},'leigang':{n:'礌岗',x:430,y:1790,t:true,ev:'money_get_50',desc:'爬虫雷岗山(¥50)。'},'qiandenghu':{n:'千灯湖',x:430,y:1747,ev:'stop_1',desc:'晚上景色很美。暂停一回合拍照。'},'jinrong':{n:'金融高新区',x:433,y:1700,ev:'money_lose_200',desc:'万达广场购物(¥200)。'},'longxi':{n:'龙溪',x:474,y:1706,ev:'nothing',desc:'花卉博览园。'},'jushu':{n:'菊树',x:518,y:1706,ev:'nothing',desc:'这里也卖花。'},'hedong':{n:'鹤洞',x:606,y:1715,ev:'nothing',desc:'广钢新城。'},'shixi':{n:'石溪',x:771,y:1728,t:true,ev:'nothing',desc:'以前很多印刷厂。'}
+};
+const LINE_DEFS={1:['xilang','kengkou','huadiwan','fangcun','huangsha','changshoulu','chenjiaci','ximenkou','gongyuanqian','nongjiangsuo','martyrs','dongshankou','yangji','tiyuxilu','tiyuzhongxin','guangzhoudong'],2:['jiahewanggang','huangbian','jiangxia','xiaogang','baiyuncal','baiyunpark','feixiang','sanyuanli','guangzhouhuo','yuexiupark','jiniantang','gongyuanqian','haizhu','shiergong','jiangnanxi','changgang','jiangtai','dongxiaonan','nanzhou','luoxi','nanpu','huijiang','shibi','guangzhounan'],3:['jichangbei','jichangnan','gaozeng','renhe','longgui','jiahewanggang','baiyundadao','yongtai','tonghe','jingxi','meihuayuan','yantang','guangzhoudong','linhexi','tiyuxilu','zhujiang','guangzhouta','kecun','datang','lijiao','xiajiao','dashi','hanxi','shiqiao','panyu','bangjiang','shiqinan','haiyonglu','haibang'],'3z':['tianhekeyun','wushan','huashi','gangding','shipaiqiao','tiyuxilu'],4:['nansha_keyun','nanheng','tangkeng','dashan','guanglong','feishajiao','jinzhou','jiaomen','huangge','huanggechuan','qingsheng','dongchong','dichong','haibang','shiqi','guanqiao','xinzao','daxuecheng_nan','daxuecheng_bei','guanzhou','wanshengwei','chebeinan','chebei','huangcun'],5:['jiaokou','tanwei','zhongshanba','xichang','xicun','guangzhouhuo','xiaobei','taojin','quzhuang','dongwuyuan','yangji','wuyangcun','zhujiang','liede','tancun','yuancun','keyunlu','chebeinan','dongpu','sanxi','yuzhu','dashadi','dashadong','wenchong','shuangsha','miaotou','xiayuan','baoying','xiagang','huangpuxingang'],6:['xunfenggang','hengsha','shabei','hesha','tanwei','ruyifang','huangsha','wenhuagongyuan','yide','haizhu','beijinglu','tuanyida','donghu','dongshankou','quzhuang','huanghuagang','shaheding','shahe','tianpingjia','yantang','tianhekeyun','changban','zhiwuyuan','longdong','kemulang','gaotangshi','huangpei','jinfeng','xiangang','suyuan','luogang','xiangxue'],7:['meididadao','beijiao','midea','nanchong','jinlong','chencun','chencunbei','dazhou','guangzhounan','shibi','xiecun','zhongcun','hanxi','nancun','yuangang','banqiao','daxuecheng_nan','shenjing','changzhou','yufengwei','dashadong','jizhang','jiazhuang','kefenglu','luogang','shuixi','yanshan'],8:['jiaoxin','tinggang','shijing','xiaoping','shitan','julong','shangbu','tongde','ezhangtan','xicun','caihongqiao','chenjiaci','hualinsi','wenhuagongyuan','tongfuxi','fenghuang','shayuan','baogang','changgang','xiaogang8','zhongda','lujiang','kecun','chigang','modiesha','xingangdong','pazhou','wanshengwei'],9:['feieling','huaduziche','guangzhoubei','huachenglu','huaguoshan','huaduguang','maanshan','liantang','qingbu','qingtang','gaozeng'],10:['xilang','huawei','dongsha','daganwei','gongyedadaonan','dongxiaonan','wufeng','zhongdananmen','binjiangdong','donghu','wuyangcun','yangjidong'],11:['chisha','pazhou','yuancun','tianhepark','huajinglu','huashi','longkouxi','guangzhoudong','shahe','yuntai','dajinzhong','zhongyiyao','ziyuangang','guangzhouhuo','liuhua','caihongqiao','zhongshanba','ruyifang','shiweitang','fangcun','dachongkou','shayong','hedongdong','diyuan','yangang','jiangtai','wufeng','yijinglu','shangyong','datang','longtan','chisha'],12:['xunfenggang','xunfenggangbei','xizhou','julong','guangzhoubaiyun','tangyong','xinshixu','baiyuncal','guangzhoutiyuguan'],'12s':['ershadao','chigangta','chigang','chishabei','chisha','beishan','guanzhou','daxuecheng_bei','daxuecheng_nan'],13:['tianhepark','tangxia','chebei','tianhezhucun','yuzhu','yufengwei','shuanggang','nanhai','xiayuan','nanagang','shacun','baijiang','xintang','guanhu','xinsha'],14:['lejialu','yunxiaolu','xinshixu','mawu','hebian','helong','pengbian','jiahewanggang','baiyundongping','xialiang','taihe','zhuliao','zhongluotan','mali','xinhe','taiping','shengang','chicao','conghuakeyun','dongfeng'],'14z':['xinhe','hongwei','xinnan','fengxia','zhishicheng','hetangxia','wangcun','tangcun','zhenlongbei','zhenlong'],18:['wanqingsha','hengli','panyu','nancun','shaxi','longtan','modiesha','xiancun'],21:['tianhepark','tangdong','huangcun','daguannan','tianhezhineng','shenzhou','kexuecheng','suyuan','shuixi','changping','jinkeng','zhenlongxi','zhenlong','zhonggang','kengbei','fenggang','zhucun','shantian','zhonggang21','zengcheng'],22:['fangcun','xilang','nanjiao','nanpu_22','chentougang','guangzhounan','shiguanglu','panyu'],'apm':['guangzhouta','haixinsha','opera','huacheng','women','huangpu','tianhenan','tiyuzhongxin_s','linhexi'],'gf':['xinchengdong','dongping','shijilian','lanshi','kuiqilu','jihuayuan','tongji','zumiao','pujunbei','chaoan','guicheng','nangui','leigang','qiandenghu','jinrong','longxi','jushu','xilang','hedong','shayong','shayuan','yangang','shixi','nanzhou','lijiao']};
+const ROLES=[{id:'landlord',n:'包租公',c:'#FFD700',d:'城中村(客村/大塘)收租翻倍'},{id:'worker',n:'CBD白领',c:'#00BFFF',d:'经过珠江新城获得奖金'},{id:'local',n:'西关少爷',c:'#FF69B4',d:'老城区(1号线)事件奖励高'},{id:'student',n:'特种兵',c:'#32CD32',d:'体力无限，免疫暂停'}];
+const START_SPOTS=[{id:'xilang',n:'西塱(1)',c:'#f3d03e'},{id:'jiahewanggang',n:'嘉禾望岗(2)',c:'#006c9d'},{id:'jichangbei',n:'机场北(3)',c:'#f7941d'},{id:'tianhekeyun',n:'天河客运站(3Z)',c:'#f7941d'},{id:'nansha_keyun',n:'南沙客运港(4)',c:'#00863f'},{id:'jiaokou',n:'滘口(5)',c:'#c5003e'},{id:'xunfenggang',n:'浔峰岗(6)',c:'#833178'},{id:'meididadao',n:'美的大道(7)',c:'#9fb62d'},{id:'jiaoxin',n:'滘心(8)',c:'#008583'},{id:'feieling',n:'飞鹅岭(9)',c:'#78c694'},{id:'xilang',n:'西塱(10)',c:'#7d9bc1'},{id:'chisha',n:'赤沙(11)',c:'#482684'},{id:'xunfenggang',n:'浔峰岗(12)',c:'#77892b'},{id:'ershadao',n:'二沙岛(12S)',c:'#77892b'},{id:'tianhepark',n:'天河公园(13)',c:'#8e8c13'},{id:'lejialu',n:'乐嘉路(14)',c:'#81312f'},{id:'xinhe',n:'新和(14Z)',c:'#81312f'},{id:'wanqingsha',n:'万顷沙(18)',c:'#004a98'},{id:'tianhepark',n:'天河公园(21)',c:'#2f2e78'},{id:'fangcun',n:'芳村(22)',c:'#d65636'},{id:'guangzhouta',n:'广州塔(APM)',c:'#00b5e2'},{id:'xinchengdong',n:'新城东(GF)',c:'#c3cc17'}];
+const CHANCE_CARDS=[{title:"🚇 羊城通充值",content:"余额充足，心情大好！",money:300,move:0,stop:0},{title:"🌧️ 突降暴雨",content:"在便利店买了把伞，花费巨资。",money:-100,move:0,stop:0},{title:"👮 逃票被抓",content:"被工作人员当场拿下！补票加罚款。",money:-200,move:0,stop:0},{title:"🚀 顺风车",content:"搭上了末班车，再前进2步！",money:0,move:2,stop:0},{title:"😴 睡过头",content:"坐过站了... 后退1步。",money:0,move:-1,stop:0},{title:"🏥 肠胃不适",content:"路边摊吃坏肚子，原地休息。",money:0,move:0,stop:1}];
+
+// ============================================================
+// 音效与逻辑
+// ============================================================
 const SFX = {
     ctx: null,
     init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
@@ -245,30 +229,19 @@ let game = {
     totalPlayers: 0, players: [], turn: 0, mode: 'work', target: 'zhujiang', validDestinations: [], pathMap: {}
 };
 
-window.onload = () => buildGraph();
+window.onload = () => {
+    buildGraph();
+    setTimeout(initNetwork, 1000); // 延迟启动网络
+};
 
-// ==========================================
-// 2. 游戏核心逻辑 (已修改为主动触发同步)
-// ==========================================
-
-function initGameStep1(num) { 
-    game.totalPlayers = num; 
-    showScreen('screen-mode'); 
-    syncGameState(); // 🚨 关键修复：立即同步
-}
-
+function initGameStep1(num) { game.totalPlayers = num; showScreen('screen-mode'); syncGameState(); }
 function selectMode(m, el) {
     game.mode = m; game.target = (m==='work') ? 'zhujiang' : null;
     document.querySelectorAll('#screen-mode .select-card').forEach(c => c.classList.remove('selected'));
     el.classList.add('selected');
-    syncGameState(); // 🚨 关键修复：立即同步
+    syncGameState();
 }
-
-function toRoleSelect() { 
-    renderRoleSelection(0); 
-    showScreen('screen-roles'); 
-    syncGameState(); // 🚨 关键修复：立即同步
-}
+function toRoleSelect() { renderRoleSelection(0); showScreen('screen-roles'); syncGameState(); }
 
 function renderRoleSelection(pid) {
     const container = document.getElementById('role-container'); container.innerHTML = '';
@@ -286,15 +259,12 @@ function confirmRole(pid, role) {
     game.players.push({ id: pid, name: `玩家${pid+1}`, role: role, color: role.c, sid: null, skip: 0, speedBuff: false, money: 2000, buffs: [], isJailed: false, jailTurns: 0, isBankrupt: false });
     if (pid < game.totalPlayers - 1) renderRoleSelection(pid + 1);
     else initWheel(0);
-    syncGameState(); // 🚨 关键修复：立即同步
+    syncGameState();
 }
 
 function initWheel(pid) {
-    showScreen('screen-wheel'); 
-    // 安全检查，防止数组越界
-    if (!game.players[pid]) return;
-    
-    const p = game.players[pid];
+    showScreen('screen-wheel'); const p = game.players[pid];
+    if(!p) return;
     document.getElementById('wheel-player').innerText = p.name; document.getElementById('wheel-player').style.color = p.color;
     document.getElementById('spin-btn').disabled = false; document.getElementById('wheel-result').innerText = '';
     const w = document.getElementById('wheel'); w.innerHTML = '';
@@ -308,34 +278,25 @@ function initWheel(pid) {
 }
 
 function spinWheel() {
-    document.getElementById('spin-btn').disabled = true; 
-    const w = document.getElementById('wheel');
+    document.getElementById('spin-btn').disabled = true; const w = document.getElementById('wheel');
     const rot = 1800 + Math.random() * 360; 
     
-    // 告诉对方我在转，并告知结果
     const idx = Math.floor((rot % 360) / (360 / START_SPOTS.length));
-    const res = START_SPOTS[idx];
+    const res = START_SPOTS[idx]; 
     
-    // 发送转盘动画指令
     if(conn && conn.open) {
-        conn.send({
-            type: 'SYNC_WHEEL',
-            rotation: rot,
-            resultName: res.n
-        });
+        conn.send({ type: 'SYNC_WHEEL', rotation: rot, resultName: res.n });
     }
-
+    
     w.style.transform = `rotate(-${rot}deg)`;
     
     setTimeout(() => {
         const pid = game.players.findIndex(p => p.sid === null);
-        game.players[pid].sid = res.id; 
-        document.getElementById('wheel-result').innerText = `出发: ${res.n}`;
-        
+        game.players[pid].sid = res.id; document.getElementById('wheel-result').innerText = `出发: ${res.n}`;
         setTimeout(() => {
+            syncGameState();
             if (pid < game.totalPlayers - 1) initWheel(pid + 1);
             else startGame();
-            syncGameState(); // 动画结束，同步状态
         }, 1500);
     }, 3000);
 }
@@ -377,7 +338,7 @@ function rollDice() {
             clearInterval(timer); let val = parseInt(document.getElementById('dice-box').innerText);
             let steps = p.speedBuff ? val * 2 : val; p.speedBuff = false;
             calculateDestinations(p, steps);
-            syncGameState(); // 同步骰子结果
+            syncGameState();
         }
     }, 50);
 }
@@ -404,7 +365,7 @@ function calculateDestinations(p, steps) {
         setTimeout(() => movePlayer(target), 800);
     } else {
         highlightDestinations(true); document.getElementById('ui-tip').innerText = `🖱️ 请手动选择目的地`;
-        syncGameState(); // 同步高亮选择
+        syncGameState();
     }
 }
 
@@ -420,11 +381,7 @@ function highlightDestinations(active) {
 
 async function movePlayer(targetSid) {
     highlightDestinations(false); const p = game.players[game.turn]; const path = game.pathMap[targetSid] || [targetSid];
-    // 同步移动动作
-    if(conn && conn.open) {
-        conn.send({ type: 'PLAYER_MOVE', targetSid: targetSid });
-    }
-
+    if(conn && conn.open) conn.send({ type: 'PLAYER_MOVE', targetSid: targetSid });
     for (let nextSid of path) { p.sid = nextSid; renderPlayers(); SFX.play('tick'); centerCamera(nextSid); updateUI(); await new Promise(r => setTimeout(r, 300)); }
     if (game.mode === 'work' && p.sid === game.target) { showModal('胜利', '到达珠江新城！'); setTimeout(() => endGame(p), 2000); }
     else { setTimeout(() => handleEvent(p, STATIONS[p.sid]), 300); }
@@ -492,7 +449,7 @@ function nextTurn() {
     do { game.turn = (game.turn + 1) % game.totalPlayers; } while (game.players[game.turn].isBankrupt);
     updateUI(); document.getElementById('roll-btn').disabled = false; document.getElementById('dice-box').innerText = '?';
     centerCamera(game.players[game.turn].sid);
-    syncGameState(); // 同步回合变更
+    syncGameState();
 }
 
 function renderMap() {
@@ -538,15 +495,25 @@ function updateUI() {
 }
 
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+function showModal(t, c) { document.getElementById('modal-title').innerHTML = t; document.getElementById('modal-content').innerHTML = c; document.getElementById('modal-overlay').style.display = 'block'; document.getElementById('modal').style.display = 'block'; }
+function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; document.getElementById('modal').style.display = 'none'; nextTurn(); }
+function endGame(winner) { showScreen('screen-end'); document.getElementById('winner-name').innerText = winner.name; document.getElementById('winner-role').innerText = winner.role.n; }
 
-// ==========================================
-// 3. 联机核心代码逻辑 (PeerJS) - 修复版
-// ==========================================
+/* ============================================================
+   PeerJS 联机核心逻辑 (修复 ID 获取卡顿问题)
+   ============================================================ */
 let peer = null;
 let conn = null;
 
 function initNetwork() {
+    // 随机ID，防止冲突
     const randomId = 'gz-' + Math.floor(Math.random() * 9000 + 1000);
+    // 确保 Peer 库已加载
+    if (typeof Peer === 'undefined') {
+        alert("PeerJS 库未加载，请检查网络！");
+        return;
+    }
+    
     peer = new Peer(randomId);
 
     peer.on('open', (id) => {
@@ -555,17 +522,19 @@ function initNetwork() {
 
     peer.on('connection', (c) => {
         handleConnection(c);
-        showConnectedUI('对方已加入，你是房主');
-        // 🚨 关键修复：无条件立即同步，无论当前是哪个界面
-        syncGameState();
+        showConnectedUI('对方已连入');
+        syncGameState(); // 连入瞬间立即同步
     });
 
-    peer.on('error', (err) => { alert('联机错误: ' + err.type); });
+    peer.on('error', (err) => {
+        console.error(err);
+        document.getElementById('my-peer-id').innerText = "获取失败";
+    });
 }
 
 function connectToFriend() {
     const friendId = document.getElementById('remote-id-input').value.trim();
-    if (!friendId) return alert('请输入朋友ID');
+    if (!friendId) return alert('请输入ID');
     conn = peer.connect(friendId);
     handleConnection(conn);
     showConnectedUI('已连接对方');
@@ -579,31 +548,24 @@ function handleConnection(connection) {
         } else if (data.type === 'SHOW_MODAL') {
             showModal(data.title, data.content, true);
         } else if (data.type === 'SYNC_WHEEL') {
-            // 转盘动画同步
             const w = document.getElementById('wheel');
             w.style.transform = `rotate(-${data.rotation}deg)`;
             document.getElementById('spin-btn').disabled = true;
             document.getElementById('wheel-result').innerText = `出发: ${data.resultName}`;
         }
     });
-    // 🚨 关键修复：连接建立后，主机再次尝试同步
-    conn.on('open', () => { 
-        console.log("连接通道建立，尝试同步...");
-        syncGameState(); 
-    });
+    // 关键：连接一旦建立，立刻发送同步
+    conn.on('open', () => { syncGameState(); });
 }
 
 function syncGameState() {
     if (conn && conn.open) {
-        // 简单深拷贝，防止循环引用
         const safeGame = JSON.parse(JSON.stringify(game));
         conn.send({ type: 'SYNC_STATE', payload: safeGame });
-        console.log("已发送状态同步");
     }
 }
 
 function applyGameState(remoteGame) {
-    // 1. 同步数据
     game.turn = remoteGame.turn;
     game.players = remoteGame.players;
     game.totalPlayers = remoteGame.totalPlayers;
@@ -612,19 +574,14 @@ function applyGameState(remoteGame) {
     game.validDestinations = remoteGame.validDestinations || [];
     game.pathMap = remoteGame.pathMap || {};
 
-    // 2. 界面跳转逻辑 (修复版)
-    // 如果总人数已定，但本地还没切到模式选择
+    // 智能跳转逻辑
     if (game.totalPlayers > 0 && document.getElementById('screen-mode').classList.contains('hidden') && game.players.length === 0) {
         showScreen('screen-mode');
     }
-    
-    // 如果开始选人了
     if (game.players.length > 0 && game.players.length < game.totalPlayers) {
         if(document.getElementById('screen-roles').classList.contains('hidden')) showScreen('screen-roles');
         renderRoleSelection(game.players.length);
     }
-    
-    // 如果选完了，进转盘或地图
     if (game.players.length === game.totalPlayers && game.totalPlayers > 0) {
         const p0 = game.players[0];
         if (!p0.sid) {
@@ -635,41 +592,27 @@ function applyGameState(remoteGame) {
         }
     }
 
-    // 3. 游戏内更新
     if(!document.getElementById('screen-game').classList.contains('hidden')) {
         renderMap();
         initPlayerCards();
         renderPlayers();
-        // 只有轮到对方操作时，我才看过去；或者如果我是观众，我就一直看
-        if (game.players[game.turn].sid) centerCamera(game.players[game.turn].sid);
-        
+        if (game.players[game.turn] && game.players[game.turn].sid) centerCamera(game.players[game.turn].sid);
         if (game.validDestinations.length > 0) highlightDestinations(true);
         else highlightDestinations(false);
     }
-    
     updateUI();
 }
 
-// 劫持 showModal
+// 劫持弹窗
 const originalShowModal = showModal;
 showModal = function(t, c, isFromNet = false) {
     document.getElementById('modal-title').innerHTML = t;
     document.getElementById('modal-content').innerHTML = c;
     document.getElementById('modal-overlay').style.display = 'block';
     document.getElementById('modal').style.display = 'block';
-    
-    if (!isFromNet && conn && conn.open) {
-        conn.send({ type: 'SHOW_MODAL', title: t, content: c });
-    }
+    if (!isFromNet && conn && conn.open) conn.send({ type: 'SHOW_MODAL', title: t, content: c });
 };
 
-function closeModal() {
-    document.getElementById('modal-overlay').style.display = 'none';
-    document.getElementById('modal').style.display = 'none';
-    nextTurn(); 
-}
-
-// UI 辅助
 function copyMyId() {
     const id = document.getElementById('my-peer-id').innerText;
     navigator.clipboard.writeText(id).then(() => alert('已复制: ' + id));
@@ -678,13 +621,8 @@ function copyMyId() {
 function toggleNetPanel() {
     const p = document.getElementById('net-panel');
     const c = document.getElementById('net-content');
-    if (p.classList.contains('net-minimized')) {
-        p.classList.remove('net-minimized');
-        c.style.display = 'block';
-    } else {
-        p.classList.add('net-minimized');
-        c.style.display = 'none';
-    }
+    if (p.classList.contains('net-minimized')) { p.classList.remove('net-minimized'); c.style.display = 'block'; } 
+    else { p.classList.add('net-minimized'); c.style.display = 'none'; }
 }
 
 function showConnectedUI(msg) {
@@ -692,9 +630,6 @@ function showConnectedUI(msg) {
     document.getElementById('net-status-box').style.display = 'block';
     document.getElementById('conn-role').innerText = msg;
 }
-
-// 启动联机模块
-setTimeout(initNetwork, 1000);
 </script>
 </body>
 </html>
